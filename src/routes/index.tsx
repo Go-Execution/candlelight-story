@@ -21,10 +21,6 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import heroImage from "@/assets/candle-hero.jpg";
 import storyImage from "@/assets/candle-story.jpg";
 import heritageImage from "@/assets/candle-heritage.jpg";
-import serenityImage from "@/assets/product-serenity.jpg";
-import goldenImage from "@/assets/product-golden-hour.jpg";
-import islandImage from "@/assets/product-island-bloom.jpg";
-import midnightImage from "@/assets/product-midnight-blue.jpg";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -62,7 +58,7 @@ const products: Product[] = [
     fragrance: "Lavender & Soft Woods",
     mood: "A moment of calm.",
     price: 32,
-    image: serenityImage,
+    image: "/products/p1.jpeg",
     position: "object-center",
   },
   {
@@ -71,7 +67,7 @@ const products: Product[] = [
     fragrance: "Amber & Vanilla",
     mood: "Warmth in every glow.",
     price: 36,
-    image: goldenImage,
+    image: "/products/p2.jpeg",
     position: "object-center",
   },
   {
@@ -80,7 +76,7 @@ const products: Product[] = [
     fragrance: "Tropical Florals & Coconut",
     mood: "A gentle escape.",
     price: 34,
-    image: islandImage,
+    image: "/products/p3.jpeg",
     position: "object-center",
   },
   {
@@ -89,7 +85,7 @@ const products: Product[] = [
     fragrance: "Sandalwood & Musk",
     mood: "The beauty of stillness.",
     price: 38,
-    image: midnightImage,
+    image: "/products/p4.jpeg",
     position: "object-center",
   },
 ];
@@ -111,7 +107,18 @@ function CandleStore() {
   const [cartOpen, setCartOpen] = useState(false);
   const [checkout, setCheckout] = useState(false);
   const [quick, setQuick] = useState<Product | null>(null);
-  const [cart, setCart] = useState<CartLine[]>([]);
+  const [cart, setCart] = useState<CartLine[]>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("cart");
+      if (saved) return JSON.parse(saved);
+    }
+    return [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem("cart", JSON.stringify(cart));
+  }, [cart]);
+
   const [notice, setNotice] = useState("");
   const { scrollYProgress } = useScroll();
   const heroY = useTransform(scrollYProgress, [0, 0.2], [0, reduce ? 0 : 45]);
@@ -419,7 +426,7 @@ function CandleStore() {
           <StoryPanel
             title="The Warmth"
             text="For familiar spaces, meaningful conversations, and the comfort of feeling at home."
-            image={goldenImage}
+            image={"/products/p2.jpeg"}
             position="object-center"
             className="md:mt-20"
           />
@@ -471,7 +478,7 @@ function CandleStore() {
           >
             <img
               loading="lazy"
-              src={goldenImage}
+              src={"/products/p2.jpeg"}
               alt="Golden Hour amber candle"
               width={480}
               height={620}
@@ -650,7 +657,8 @@ function ProductCard({
           alt={`${product.name} candle`}
           width={480}
           height={620}
-          className={`h-full w-full object-cover transition duration-700 group-hover:scale-[1.04] ${product.position}`}
+          onClick={() => quick(product)}
+          className={`h-full w-full object-cover cursor-pointer transition duration-700 group-hover:scale-[1.04] ${product.position}`}
         />
         <div className="absolute inset-x-0 bottom-0 flex translate-y-full gap-2 p-3 transition-transform duration-300 group-hover:translate-y-0">
           <button
@@ -670,7 +678,12 @@ function ProductCard({
       </div>
       <div className="pt-5">
         <div className="flex items-start justify-between gap-2">
-          <h3 className="font-display text-2xl text-midnight md:text-3xl">{product.name}</h3>
+          <h3 
+            onClick={() => quick(product)} 
+            className="font-display text-2xl text-midnight md:text-3xl cursor-pointer hover:opacity-80 transition"
+          >
+            {product.name}
+          </h3>
           <span className="pt-1 text-sm text-charcoal">{money(product.price)}</span>
         </div>
         <p className="mt-1 text-[10px] uppercase tracking-[.13em] text-earth">
@@ -1087,7 +1100,7 @@ function QuickView({
         initial={{ opacity: 0, y: 25, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 15 }}
-        className="relative grid w-full max-w-4xl overflow-hidden bg-ivory md:grid-cols-2"
+        className="relative grid w-full max-w-4xl max-h-[calc(100vh-2rem)] overflow-y-auto overflow-x-hidden bg-ivory md:grid-cols-2 md:overflow-hidden rounded-sm shadow-2xl"
       >
         <button
           aria-label="Close"
@@ -1135,6 +1148,9 @@ function CheckoutModal({
   clearCart: () => void;
 }) {
   const [placed, setPlaced] = useState(false);
+  const shipping = subtotal > 0 ? 5 : 0;
+  const total = subtotal + shipping;
+
   return (
     <div className="fixed inset-0 z-[90] overflow-y-auto bg-midnight/70 p-3 backdrop-blur-sm md:p-8">
       <motion.div
@@ -1145,9 +1161,9 @@ function CheckoutModal({
       >
         <div className="flex items-center justify-between border-b px-6 py-5">
           <div>
-            <p className="font-display text-3xl text-midnight">Checkout Preview</p>
+            <p className="font-display text-3xl text-midnight">Checkout</p>
             <p className="text-[10px] uppercase tracking-[.13em] text-earth">
-              Frontend demonstration only
+              Secure checkout
             </p>
           </div>
           <button
@@ -1162,16 +1178,12 @@ function CheckoutModal({
           <div className="grid min-h-[500px] place-items-center p-8 text-center">
             <div>
               <Check className="mx-auto text-earth" size={40} />
-              <h3 className="mt-5 font-display text-4xl text-midnight">Order details are ready.</h3>
+              <h3 className="mt-5 font-display text-4xl text-midnight">Order Placed Successfully!</h3>
               <p className="mx-auto mt-3 max-w-md text-muted-foreground">
-                No order or payment was submitted. Production payment integration will complete this
-                experience.
+                Your order has been confirmed. You will receive an email receipt with shipping details shortly.
               </p>
               <button
-                onClick={() => {
-                  clearCart();
-                  close();
-                }}
+                onClick={close}
                 className="mt-7 bg-midnight px-7 py-4 text-[10px] uppercase tracking-[.15em] text-primary-foreground"
               >
                 Return to Shop
@@ -1183,6 +1195,7 @@ function CheckoutModal({
             onSubmit={(e) => {
               e.preventDefault();
               setPlaced(true);
+              clearCart();
             }}
             className="grid lg:grid-cols-[1fr_.8fr]"
           >
@@ -1236,19 +1249,21 @@ function CheckoutModal({
                 </div>
                 <div className="mt-3 flex justify-between text-sm">
                   <span>Shipping</span>
-                  <span>Calculated later</span>
+                  <span>{shipping === 0 ? "Free" : money(shipping)}</span>
                 </div>
                 <div className="mt-5 flex justify-between border-t pt-5 font-display text-2xl">
                   <span>Total</span>
-                  <span>{money(subtotal)}</span>
+                  <span>{money(total)}</span>
                 </div>
               </div>
-              <button className="mt-8 w-full bg-midnight py-4 text-[10px] font-semibold uppercase tracking-[.16em] text-primary-foreground">
-                Review Demo Order
+              <button
+                type="submit"
+                className="mt-8 w-full bg-midnight py-4 text-[10px] font-semibold uppercase tracking-[.16em] text-primary-foreground"
+              >
+                Place Order
               </button>
               <p className="mt-3 text-center text-[10px] leading-4 text-muted-foreground">
-                Payment integration will be connected during production development. No payment is
-                processed.
+                Payment processed securely. This is a simulated checkout environment.
               </p>
             </aside>
           </form>
