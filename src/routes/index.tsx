@@ -159,18 +159,12 @@ function CandleStore() {
       <header
         className={`fixed inset-x-0 top-0 z-40 transition-all duration-500 ${scrolled ? "border-b border-border bg-ivory/90 shadow-sm backdrop-blur-xl" : "bg-transparent"}`}
       >
-        <div className="mx-auto flex h-20 max-w-[1500px] items-center justify-between px-5 md:px-10">
+        <div className="mx-auto flex h-auto max-w-[1500px] items-center justify-between px-5 md:px-10">
           <button
             aria-label="Go home"
             onClick={() => scrollTo("home")}
-            className="text-left text-midnight"
           >
-            <span className="block font-display text-xl font-semibold leading-none">
-              MADELEINE LUCIA
-            </span>
-            <span className="mt-1 block text-[9px] font-medium uppercase tracking-[.28em]">
-              Candle Co.
-            </span>
+            <img src="/logo.jpeg" alt="MADELEINE LUCIA Candle Co." className="h-[160px] w-auto object-contain" />
           </button>
           <nav className="hidden items-center gap-9 lg:flex">
             {nav.map((n) => (
@@ -890,8 +884,7 @@ function Footer({ nav }: { nav: { label: string; id: string }[] }) {
     <footer className="bg-midnight px-5 pb-8 pt-20 text-primary-foreground md:px-10">
       <div className="mx-auto grid max-w-7xl gap-12 border-b border-primary-foreground/20 pb-16 md:grid-cols-[1.4fr_.6fr_.8fr]">
         <div>
-          <p className="font-display text-3xl">MADELEINE LUCIA</p>
-          <p className="mt-1 text-[9px] uppercase tracking-[.28em] text-dusty">Candle Co.</p>
+          <img src="/logo.jpeg" alt="MADELEINE LUCIA Candle Co." className="h-[160px] w-auto object-contain" />
           <p className="mt-6 font-display text-2xl italic text-primary-foreground/70">
             Handcrafted moments, made to be felt.
           </p>
