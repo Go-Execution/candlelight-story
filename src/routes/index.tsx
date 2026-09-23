@@ -166,7 +166,7 @@ function CandleStore() {
   return (
     <main>
       <header
-        className={`fixed inset-x-0 top-0 z-40 transition-all duration-500 ${scrolled ? "border-b border-border bg-[#FCEEE5]/90 shadow-sm backdrop-blur-xl" : "bg-transparent"}`}
+        className={`fixed inset-x-0 top-0 z-40 transition-all duration-500 ${scrolled ? "border-b border-border bg-[#FCEEE5] shadow-sm" : "bg-transparent"}`}
       >
         <div className="mx-auto flex h-auto max-w-[1500px] items-center justify-between px-5 md:px-10">
           <button
