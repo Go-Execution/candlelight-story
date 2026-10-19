@@ -45,6 +45,7 @@ type Product = {
   name: string;
   fragrance: string;
   mood: string;
+  size: string;
   price: number;
   image: string;
   position: string;
@@ -54,46 +55,71 @@ type CartLine = Product & { quantity: number };
 const products: Product[] = [
   {
     id: 1,
-    name: "Butterscotch and Burbon",
-    fragrance: "Sweet honey & caramel",
-    mood: "Warm and cozy, Fall and Winter time.",
-    price: 18,
+    name: "Summer Sunset",
+    fragrance: "Peach Mango & Tropical Citrus",
+    mood: "Fruity smooth with Caribbean calmness, perfect all day.",
+    size: "8 oz",
+    price: 15,
     image: "/products/bottle.jpg",
     position: "object-center",
   },
   {
     id: 2,
-    name: "Apple Harvest",
-    fragrance: "Warm apples",
-    mood: "Definitely a Fall season.",
-    price: 18,
+    name: "Ambrevelle",
+    fragrance: "Golden Amber & Warm Vanilla",
+    mood: "Warmth in every glow, an inviting evening linger.",
+    size: "8 oz",
+    price: 15,
     image: "/products/bottle.jpg",
     position: "object-center",
   },
   {
     id: 3,
-    name: "Caribbean Teakwood",
-    fragrance: "Fresh subtle morning smell",
-    mood: "Cool early morning, Summer and Spring.",
-    price: 18,
+    name: "Autumn Apple",
+    fragrance: "Macintosh Apple & Warm Orchard Spices",
+    mood: "Warm apples and crisp orchard breezes, definitely a Fall season.",
+    size: "8 oz",
+    price: 15,
     image: "/products/bottle.jpg",
     position: "object-center",
   },
   {
     id: 4,
-    name: "Peach Mango Bellini",
-    fragrance: "Fruity smooth",
-    mood: "Caribbean calmness, Summer time.",
-    price: 18,
+    name: "Caribbean Ocean",
+    fragrance: "Caribbean Teakwood & Fresh Sea Salt",
+    mood: "Fresh subtle morning smell, cool ocean breezes for Spring & Summer.",
+    size: "8 oz",
+    price: 15,
     image: "/products/bottle.jpg",
     position: "object-center",
   },
   {
     id: 5,
-    name: "Peach Nectar White Peach Blossom",
-    fragrance: "Calmly sweet smell",
-    mood: "Not too light, not too strong. It's just right.",
-    price: 18,
+    name: "Driftwood Haven",
+    fragrance: "Mahogany Teakwood & Earthy Cedar",
+    mood: "The serene beauty of stillness and grounded comfort.",
+    size: "8 oz",
+    price: 15,
+    image: "/products/bottle.jpg",
+    position: "object-center",
+  },
+  {
+    id: 6,
+    name: "Veloura Pumpkin",
+    fragrance: "Pumpkin Spice & Velvety Buttercream",
+    mood: "Cozy autumn indulgence, velvety warmth, and festive comfort.",
+    size: "8 oz",
+    price: 15,
+    image: "/products/bottle.jpg",
+    position: "object-center",
+  },
+  {
+    id: 7,
+    name: "Boozy Bourben",
+    fragrance: "Butterscotch Bourbon & Sweet Honey",
+    mood: "Warm and cozy with rich caramel notes, perfect for Fall and Winter.",
+    size: "8 oz",
+    price: 15,
     image: "/products/bottle.jpg",
     position: "object-center",
   },
@@ -457,14 +483,14 @@ function CandleStore() {
             </p>
             <div className="mt-8 flex items-end gap-8 border-t border-primary-foreground/20 pt-7">
               <div>
-                <p className="text-[9px] uppercase tracking-[.2em] text-dusty">Amber & Vanilla</p>
-                <p className="mt-2 font-display text-3xl">Golden Hour</p>
+                <p className="text-[9px] uppercase tracking-[.2em] text-dusty">Golden Amber & Warm Vanilla • 8 oz</p>
+                <p className="mt-2 font-display text-3xl">Ambrevelle</p>
               </div>
-              <span className="ml-auto font-display text-2xl">$36.00</span>
+              <span className="ml-auto font-display text-2xl">$15.00</span>
             </div>
             <button
               onClick={() => {
-                const featured = products[1];
+                const featured = products.find((p) => p.name === "Ambrevelle") || products[1];
                 if (featured) add(featured);
               }}
               className="mt-9 flex items-center gap-3 bg-ivory px-7 py-4 text-[11px] font-semibold uppercase tracking-[.16em] text-midnight transition hover:bg-sage"
@@ -481,8 +507,8 @@ function CandleStore() {
           >
             <img
               loading="lazy"
-              src={"/products/p2.jpeg"}
-              alt="Golden Hour amber candle"
+              src={"/products/bottle.jpg"}
+              alt="Ambrevelle candle"
               width={480}
               height={620}
               className="h-full w-full object-cover"
@@ -687,7 +713,10 @@ function ProductCard({
           >
             {product.name}
           </h3>
-          <span className="pt-1 text-sm text-charcoal">{money(product.price)}</span>
+          <div className="text-right">
+            <span className="block pt-1 text-sm font-medium text-charcoal">{money(product.price)}</span>
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wider">{product.size}</span>
+          </div>
         </div>
         <p className="mt-1 text-[10px] uppercase tracking-[.13em] text-earth">
           {product.fragrance}
@@ -1022,7 +1051,7 @@ function CartDrawer({
                       <div>
                         <p className="font-display text-xl text-midnight">{p.name}</p>
                         <p className="text-[10px] uppercase tracking-[.1em] text-earth">
-                          {p.fragrance}
+                          {p.fragrance} • {p.size || "8 oz"}
                         </p>
                       </div>
                       <p className="text-sm">{money(p.price * p.quantity)}</p>
@@ -1119,13 +1148,16 @@ function QuickView({
         <div className="flex flex-col justify-center p-8 md:p-12">
           <Eyebrow>Quick view</Eyebrow>
           <h2 className="mt-3 font-display text-5xl text-midnight">{product.name}</h2>
-          <p className="mt-2 text-xs uppercase tracking-[.15em] text-earth">{product.fragrance}</p>
+          <p className="mt-2 text-xs uppercase tracking-[.15em] text-earth">{product.fragrance} • {product.size}</p>
           <p className="mt-7 font-display text-2xl italic text-muted-foreground">{product.mood}</p>
           <p className="mt-6 leading-7 text-muted-foreground">
             A thoughtfully imagined candle experience created to bring warmth, atmosphere, and a
             sense of pause to your space.
           </p>
-          <p className="mt-8 font-display text-3xl">{money(product.price)}</p>
+          <p className="mt-8 font-display text-3xl">
+            {money(product.price)}{" "}
+            <span className="text-sm font-sans text-muted-foreground">({product.size})</span>
+          </p>
           <button
             onClick={add}
             className="mt-7 flex items-center justify-center gap-3 bg-midnight py-4 text-[10px] font-semibold uppercase tracking-[.16em] text-primary-foreground"
@@ -1237,7 +1269,7 @@ function CheckoutModal({
                     <div className="flex-1">
                       <p className="font-display text-lg">{p.name}</p>
                       <p className="text-[9px] uppercase tracking-[.1em] text-earth">
-                        {p.fragrance}
+                        {p.fragrance} • {p.size || "8 oz"}
                       </p>
                     </div>
                     <span className="text-sm">{money(p.price * p.quantity)}</span>
