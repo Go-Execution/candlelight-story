@@ -43,8 +43,11 @@ export const Route = createFileRoute("/")({
 type Product = {
   id: number;
   name: string;
+  category: "Candles" | "Hair Care" | "Perfumes & Oils" | "Body Care" | "Artisan Soaps";
   fragrance: string;
   mood: string;
+  ingredients?: string;
+  directions?: string;
   size: string;
   price: number;
   image: string;
@@ -53,9 +56,243 @@ type Product = {
 type CartLine = Product & { quantity: number };
 
 const products: Product[] = [
+  // --- HAIR CARE ---
   {
     id: 1,
+    name: "Amazing Hair Growth Shampoo",
+    category: "Hair Care",
+    fragrance: "Aloe Vera & Lavender Botanical Cleanse",
+    mood: "Promotes healthy, strong hair growth with gentle daily care.",
+    ingredients: "Shampoo base, Aloe Vera Gel, Vitamin E Oil, Lavender Essential Oil, Jojoba Oil. (No Paraben, No Sulfate, No Chemical)",
+    directions: "Apply small amounts on wet hair, massage into scalp, and rinse thoroughly. Shake well before use.",
+    size: "1.235 lb",
+    price: 13.99,
+    image: "/products/growth-shampoo.jpeg",
+    position: "object-center",
+  },
+  {
+    id: 2,
+    name: "Miracle Hair Oil",
+    category: "Hair Care",
+    fragrance: "Rosemary, Lavender & Black Pepper Botanical Elixir",
+    mood: "Deep nutrient infusion for root strength, length retention, and shine.",
+    ingredients: "Coconut Oil, Castor Oil, Rosemary, Lavender Oil, Sesame Oil, Vitamin E, Jojoba Oil, Biotin Oil, Wheat Germ Oil, Black Pepper Oil.",
+    directions: "Apply to your hair and scalp, leave it in for 2 hours, and wash out with shampoo.",
+    size: "0.540 lb",
+    price: 12.99,
+    image: "/products/miracle-oil.jpeg",
+    position: "object-center",
+  },
+  {
+    id: 3,
+    name: "Amazing Cream for Frizzy Hair",
+    category: "Hair Care",
+    fragrance: "Pure Coconut & Vitamin E Smoothing Balm",
+    mood: "Locks in hydration, tames unruly flyaways, and softens dry hair.",
+    ingredients: "Vaseline, Coconut Oil, Glycerin, Vitamin E Oil.",
+    directions: "Work a small amount into damp or dry hair, focusing on mid-lengths and frizzy ends.",
+    size: "0.816 lb",
+    price: 12.99,
+    image: "/products/frizzy-hair-cream.jpeg",
+    position: "object-center",
+  },
+  {
+    id: 4,
+    name: "Rapunzel Hair Growth Spray",
+    category: "Hair Care",
+    fragrance: "Fermented Rice Water, Flaxseed & Warm Cloves",
+    mood: "Traditional hair growth tonic inspired by ancient botanical rituals.",
+    ingredients: "Flaxseed, Fermented Rice Water, Black Seed, Bay Leaves, Cinnamon Stick, Cloves.",
+    directions: "Shake well before use. Spray evenly on hair and scalp, leave for 2 hours, then wash with shampoo. Use 3 times a week. Keep refrigerated.",
+    size: "0.916 lb",
+    price: 11.99,
+    image: "/products/hair-spray.jpeg",
+    position: "object-center",
+  },
+
+  // --- PERFUMES & OILS ---
+  {
+    id: 5,
+    name: "'Smell Me' Concentrated Oil Perfume",
+    category: "Perfumes & Oils",
+    fragrance: "Almond, Rose, Sabaya, Ahlam Al Arab & Anfar",
+    mood: "An alluring roll-on perfume oil that stays close to the skin all day.",
+    ingredients: "Almond Oil, Rose Oil, Sabaya Oil, Ahlam Al Arab Oil, Anfar Oil.",
+    directions: "Roll onto pulse points: wrists, neck, and behind ears.",
+    size: "10 ml Roll-on",
+    price: 10.99,
+    image: "/products/oil-perfume-rollon.jpeg",
+    position: "object-center",
+  },
+  {
+    id: 6,
+    name: "'Smells Great' Artisanal Perfume",
+    category: "Perfumes & Oils",
+    fragrance: "Ehsas Oil, Lavender, Sandalwood & Rich Musk",
+    mood: "Handcrafted signature perfume with deep woody notes and tranquil lavender.",
+    ingredients: "Ehsas Oil, Lavender Oil, Sandalwood Oil, Fine Perfume Base Top.",
+    directions: "Apply or mist on pulse points for an intimate, lasting personal aroma.",
+    size: "Artisan Bottle",
+    price: 11.99,
+    image: "/products/artisan-perfume.jpeg",
+    position: "object-center",
+  },
+
+  // --- BODY & SKIN CARE ---
+  {
+    id: 7,
+    name: "Snow White Body Treatment Cream",
+    category: "Body Care",
+    fragrance: "Shea Butter, Pure Honey & Moroccan Rose Water",
+    mood: "Intense skin rejuvenating treatment for total body softness and luminosity.",
+    ingredients: "Citric Soap, Jergens, Shea Butter, Vitamin E Oil, Honey, Rose Water.",
+    directions: "Apply one layer, let dry, then apply another layer. Use with a little warm water and gently scrub with a Moroccan loofah. Use daily or every other day. Keep refrigerated.",
+    size: "1.999 lb",
+    price: 39.99,
+    image: "/products/snow-white-cream.jpeg",
+    position: "object-center",
+  },
+  {
+    id: 8,
+    name: "Arab Oud Delicate Body Cream",
+    category: "Body Care",
+    fragrance: "Precious Oud, Sandalwood & Sensul Musk",
+    mood: "Sensual warmth and opulent fragrance for delicate, intimate areas.",
+    ingredients: "Oud Oil, Sandalwood Oil, Anfar Oil, Musk Powder, Vaseline, Sensul Oil.",
+    directions: "Gently massage around private area, neckline, and under the chest.",
+    size: "0.366 lb",
+    price: 12.99,
+    image: "/products/arab-oud-cream.jpeg",
+    position: "object-center",
+  },
+
+  // --- ARTISAN SOAPS ---
+  {
+    id: 9,
+    name: "Faucet Hanging Hand Soap (Rope Cluster)",
+    category: "Artisan Soaps",
+    fragrance: "Gentle Berry & Botanical Cleanse",
+    mood: "Decorative beaded soap cluster on braided jute rope to hang on your faucet.",
+    ingredients: "Pure botanical glycerin soap base, essential oils, natural color.",
+    directions: "Hang loop over your kitchen or bathroom faucet for convenient, mess-free handwashing.",
+    size: "Full Cluster",
+    price: 9.99,
+    image: "/products/faucet-soap-rope.jpeg",
+    position: "object-center",
+  },
+  {
+    id: 10,
+    name: "Hibiscus Glow Facial Soap",
+    category: "Artisan Soaps",
+    fragrance: "Pure Hibiscus & Botanical Moisture",
+    mood: "Brightens dull skin, evens complexion, and locks in deep hydration.",
+    ingredients: "Hibiscus extract, plant glycerin soap base.",
+    directions: "Lather with warm water, gently cleanse face and neck, and rinse.",
+    size: "Artisan Bar",
+    price: 9.99,
+    image: "/products/hibiscus-soap.jpeg",
+    position: "object-center",
+  },
+  {
+    id: 11,
+    name: "Frankincense Radiance Soap",
+    category: "Artisan Soaps",
+    fragrance: "Frankincense Essence & Cooling Aloe Vera",
+    mood: "Restores skin elasticity, calms redness, and leaves skin refreshed.",
+    ingredients: "Frankincense liquid, Glycerin soap, Aloe Vera extract.",
+    directions: "Massage rich lather over face and body, then rinse with warm water.",
+    size: "Artisan Bar",
+    price: 9.99,
+    image: "/products/frankincense-soap.jpeg",
+    position: "object-center",
+  },
+  {
+    id: 12,
+    name: "Coffee & Cocoa Exfoliating Soap",
+    category: "Artisan Soaps",
+    fragrance: "Roasted Coffee Beans & Raw Cocoa",
+    mood: "Natural micro-exfoliation to soften rough patches and revitalize texture.",
+    ingredients: "Handcrafted coffee, cocoa, and pure glycerin soap with no additives.",
+    directions: "Use gently on wet skin in circular motions to polish and cleanse.",
+    size: "Artisan Bar",
+    price: 9.99,
+    image: "/products/coffee-soap.jpeg",
+    position: "object-center",
+  },
+  {
+    id: 13,
+    name: "Pure Lemon Radiance Soap",
+    category: "Artisan Soaps",
+    fragrance: "Crisp Sun-Ripened Lemon Citrus",
+    mood: "Clarifies pores, lifts impurities, and gives skin a radiant natural glow.",
+    ingredients: "Pure citric oil, plant glycerin soap base.",
+    directions: "Lather and cleanse face and body daily for bright, luminous skin.",
+    size: "Artisan Bar",
+    price: 9.99,
+    image: "/products/lemon-soap.jpeg",
+    position: "object-center",
+  },
+
+  // --- CANDLES ---
+  {
+    id: 14,
+    name: "Purple Floral & Pearl Glass Candle",
+    category: "Candles",
+    fragrance: "Lavender Blossom & Soft Vanilla Cream",
+    mood: "Preserved purple botanicals and luminous pearls embedded in clear gel.",
+    size: "Decorative Bowl",
+    price: 9.99,
+    image: "/products/candle-purple-floral.jpeg",
+    position: "object-center",
+  },
+  {
+    id: 15,
+    name: "Ocean Azure & Pearl Glass Candle",
+    category: "Candles",
+    fragrance: "Ocean Breeze, Sea Salt & Marine Botanicals",
+    mood: "Crisp ocean blue wax over crystal gel, blue floral petals, and pearls.",
+    size: "Decorative Bowl",
+    price: 9.99,
+    image: "/products/candle-ocean-azure.jpeg",
+    position: "object-center",
+  },
+  {
+    id: 16,
+    name: "Amethyst & Glass Gems Candle",
+    category: "Candles",
+    fragrance: "Velvet Plum & Amethyst Amber",
+    mood: "Jewel-toned wax floating above iridescent glass marbles and crystal bubbles.",
+    size: "Decorative Bowl",
+    price: 9.99,
+    image: "/products/candle-amethyst-gems.jpeg",
+    position: "object-center",
+  },
+  {
+    id: 17,
+    name: "Sunburst Pearl Glass Candle",
+    category: "Candles",
+    fragrance: "Sun-Drenched Citrus & Golden Honey",
+    mood: "Warm sunny yellow wax atop gleaming pearls and crystal beads.",
+    size: "Decorative Bowl",
+    price: 9.99,
+    image: "/products/candle-sunburst-yellow.jpeg",
+    position: "object-center",
+  },
+  {
+    id: 18,
+    name: "Golden Pearl Glow Candle",
+    category: "Candles",
+    fragrance: "Warm Spiced Amber & Caramelized Vanilla",
+    mood: "Lustrous golden pearls resting in crystal gel beneath rich aromatic wax.",
+    size: "Decorative Bowl",
+    price: 9.99,
+    image: "/products/candle-golden-pearl.jpeg",
+    position: "object-center",
+  },
+  {
+    id: 19,
     name: "Summer Sunset",
+    category: "Candles",
     fragrance: "Peach Mango & Tropical Citrus",
     mood: "Fruity smooth with Caribbean calmness, perfect all day.",
     size: "8 oz",
@@ -64,8 +301,9 @@ const products: Product[] = [
     position: "object-center",
   },
   {
-    id: 2,
+    id: 20,
     name: "Ambrevelle",
+    category: "Candles",
     fragrance: "Golden Amber & Warm Vanilla",
     mood: "Warmth in every glow, an inviting evening linger.",
     size: "8 oz",
@@ -74,8 +312,9 @@ const products: Product[] = [
     position: "object-center",
   },
   {
-    id: 3,
+    id: 21,
     name: "Autumn Apple",
+    category: "Candles",
     fragrance: "Macintosh Apple & Warm Orchard Spices",
     mood: "Warm apples and crisp orchard breezes, definitely a Fall season.",
     size: "8 oz",
@@ -84,8 +323,9 @@ const products: Product[] = [
     position: "object-center",
   },
   {
-    id: 4,
+    id: 22,
     name: "Caribbean Ocean",
+    category: "Candles",
     fragrance: "Caribbean Teakwood & Fresh Sea Salt",
     mood: "Fresh subtle morning smell, cool ocean breezes for Spring & Summer.",
     size: "8 oz",
@@ -94,8 +334,9 @@ const products: Product[] = [
     position: "object-center",
   },
   {
-    id: 5,
+    id: 23,
     name: "Driftwood Haven",
+    category: "Candles",
     fragrance: "Mahogany Teakwood & Earthy Cedar",
     mood: "The serene beauty of stillness and grounded comfort.",
     size: "8 oz",
@@ -104,8 +345,9 @@ const products: Product[] = [
     position: "object-center",
   },
   {
-    id: 6,
+    id: 24,
     name: "Veloura Pumpkin",
+    category: "Candles",
     fragrance: "Pumpkin Spice & Velvety Buttercream",
     mood: "Cozy autumn indulgence, velvety warmth, and festive comfort.",
     size: "8 oz",
@@ -114,8 +356,9 @@ const products: Product[] = [
     position: "object-center",
   },
   {
-    id: 7,
+    id: 25,
     name: "Boozy Bourben",
+    category: "Candles",
     fragrance: "Butterscotch Bourbon & Sweet Honey",
     mood: "Warm and cozy with rich caramel notes, perfect for Fall and Winter.",
     size: "8 oz",
@@ -155,6 +398,12 @@ function CandleStore() {
   }, [cart]);
 
   const [notice, setNotice] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("All");
+  const categories = ["All", "Hair Care", "Perfumes & Oils", "Body Care", "Artisan Soaps", "Candles"];
+  const filteredProducts = useMemo(
+    () => (selectedCategory === "All" ? products : products.filter((p) => p.category === selectedCategory)),
+    [selectedCategory],
+  );
   const { scrollYProgress } = useScroll();
   const heroY = useTransform(scrollYProgress, [0, 0.2], [0, reduce ? 0 : 45]);
 
@@ -416,20 +665,35 @@ function CandleStore() {
 
       <section id="collection" className="bg-cream px-4 py-24 md:px-10 lg:py-32">
         <motion.div {...fade} className="mx-auto max-w-7xl text-center">
-          <Eyebrow>The collection</Eyebrow>
+          <Eyebrow>Handcrafted Collection</Eyebrow>
           <h2 className="mt-4 font-display text-5xl text-midnight md:text-7xl">
-            Find Your <em>Perfect Moment.</em>
+            Find Your <em>Self-Care Ritual.</em>
           </h2>
           <p className="mx-auto mt-5 max-w-2xl leading-7 text-muted-foreground">
-            A curated collection of candle experiences inspired by comfort, warmth, beautiful
-            memories, and everyday rituals.
+            A curated collection of handcrafted candles, botanical hair care, artisanal perfumes, and nourishing skin rituals.
           </p>
-          <p className="mt-3 text-[10px] uppercase tracking-[.18em] text-muted-foreground">
-            Sample collection and pricing for demonstration
-          </p>
+
+          <div className="mt-10 flex flex-wrap items-center justify-center gap-2">
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                className={`rounded-full px-5 py-2.5 text-xs font-semibold uppercase tracking-wider transition-all duration-300 ${
+                  selectedCategory === cat
+                    ? "bg-midnight text-primary-foreground shadow-md scale-105"
+                    : "bg-ivory/90 text-midnight hover:bg-powder border border-border/70"
+                }`}
+              >
+                {cat}
+                <span className="ml-1.5 opacity-60 text-[10px]">
+                  ({cat === "All" ? products.length : products.filter((p) => p.category === cat).length})
+                </span>
+              </button>
+            ))}
+          </div>
         </motion.div>
         <div className="mx-auto mt-14 grid max-w-[1500px] grid-cols-2 gap-x-3 gap-y-10 md:gap-6 lg:grid-cols-4">
-          {products.map((p, i) => (
+          {filteredProducts.map((p, i) => (
             <ProductCard key={p.id} product={p} index={i} add={add} quick={setQuick} />
           ))}
         </div>
@@ -706,22 +970,23 @@ function ProductCard({
         </div>
       </div>
       <div className="pt-5">
+        <div className="flex items-center justify-between text-[10px] uppercase tracking-wider text-earth mb-1">
+          <span>{product.category}</span>
+          <span className="text-muted-foreground">{product.size}</span>
+        </div>
         <div className="flex items-start justify-between gap-2">
           <h3 
             onClick={() => quick(product)} 
-            className="font-display text-2xl text-midnight md:text-3xl cursor-pointer hover:opacity-80 transition"
+            className="font-display text-2xl text-midnight md:text-3xl cursor-pointer hover:opacity-80 transition line-clamp-2"
           >
             {product.name}
           </h3>
-          <div className="text-right">
-            <span className="block pt-1 text-sm font-medium text-charcoal">{money(product.price)}</span>
-            <span className="text-[10px] text-muted-foreground uppercase tracking-wider">{product.size}</span>
-          </div>
+          <span className="block pt-1 text-sm font-semibold text-charcoal shrink-0">{money(product.price)}</span>
         </div>
-        <p className="mt-1 text-[10px] uppercase tracking-[.13em] text-earth">
+        <p className="mt-1 text-[11px] leading-tight text-earth line-clamp-1">
           {product.fragrance}
         </p>
-        <p className="mt-2 hidden font-display text-lg italic text-muted-foreground sm:block">
+        <p className="mt-2 hidden font-display text-base italic text-muted-foreground sm:block line-clamp-2">
           {product.mood}
         </p>
         <div className="mt-4 flex gap-2 sm:hidden">
@@ -1145,22 +1410,33 @@ function QuickView({
           alt={`${product.name} candle`}
           className="h-72 w-full object-cover md:h-[600px]"
         />
-        <div className="flex flex-col justify-center p-8 md:p-12">
-          <Eyebrow>Quick view</Eyebrow>
-          <h2 className="mt-3 font-display text-5xl text-midnight">{product.name}</h2>
-          <p className="mt-2 text-xs uppercase tracking-[.15em] text-earth">{product.fragrance} • {product.size}</p>
-          <p className="mt-7 font-display text-2xl italic text-muted-foreground">{product.mood}</p>
-          <p className="mt-6 leading-7 text-muted-foreground">
-            A thoughtfully imagined candle experience created to bring warmth, atmosphere, and a
-            sense of pause to your space.
-          </p>
-          <p className="mt-8 font-display text-3xl">
+        <div className="flex flex-col justify-center p-8 md:p-12 overflow-y-auto max-h-[85vh]">
+          <div className="flex items-center gap-2">
+            <Eyebrow>{product.category}</Eyebrow>
+            <span className="text-[10px] text-muted-foreground uppercase tracking-widest">• {product.size}</span>
+          </div>
+          <h2 className="mt-2 font-display text-3xl text-midnight md:text-5xl">{product.name}</h2>
+          <p className="mt-1 text-xs uppercase tracking-[.15em] text-earth">{product.fragrance}</p>
+          <p className="mt-4 font-display text-lg italic text-muted-foreground">{product.mood}</p>
+          {product.ingredients && (
+            <div className="mt-4 rounded-sm border border-border/70 bg-cream/70 p-3 text-xs">
+              <span className="font-semibold text-midnight">Ingredients: </span>
+              <span className="text-charcoal/85">{product.ingredients}</span>
+            </div>
+          )}
+          {product.directions && (
+            <div className="mt-2 rounded-sm border border-border/70 bg-cream/40 p-3 text-xs">
+              <span className="font-semibold text-midnight">Directions: </span>
+              <span className="text-charcoal/85">{product.directions}</span>
+            </div>
+          )}
+          <p className="mt-6 font-display text-3xl">
             {money(product.price)}{" "}
             <span className="text-sm font-sans text-muted-foreground">({product.size})</span>
           </p>
           <button
             onClick={add}
-            className="mt-7 flex items-center justify-center gap-3 bg-midnight py-4 text-[10px] font-semibold uppercase tracking-[.16em] text-primary-foreground"
+            className="mt-6 flex items-center justify-center gap-3 bg-midnight py-4 text-[10px] font-semibold uppercase tracking-[.16em] text-primary-foreground transition hover:bg-earth"
           >
             Add to Bag <ShoppingBag size={15} />
           </button>
