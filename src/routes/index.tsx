@@ -60,7 +60,7 @@ const products: Product[] = [
     mood: "Fruity smooth with Caribbean calmness, perfect all day.",
     size: "8 oz",
     price: 15,
-    image: "/products/bottle.jpg",
+    image: "/products/summer-sunset.jpg",
     position: "object-center",
   },
   {
@@ -70,7 +70,7 @@ const products: Product[] = [
     mood: "Warmth in every glow, an inviting evening linger.",
     size: "8 oz",
     price: 15,
-    image: "/products/bottle.jpg",
+    image: "/products/ambrevelle.jpg",
     position: "object-center",
   },
   {
@@ -80,7 +80,7 @@ const products: Product[] = [
     mood: "Warm apples and crisp orchard breezes, definitely a Fall season.",
     size: "8 oz",
     price: 15,
-    image: "/products/bottle.jpg",
+    image: "/products/autumn-apple.jpg",
     position: "object-center",
   },
   {
@@ -90,7 +90,7 @@ const products: Product[] = [
     mood: "Fresh subtle morning smell, cool ocean breezes for Spring & Summer.",
     size: "8 oz",
     price: 15,
-    image: "/products/bottle.jpg",
+    image: "/products/caribbean-ocean.jpg",
     position: "object-center",
   },
   {
@@ -100,7 +100,7 @@ const products: Product[] = [
     mood: "The serene beauty of stillness and grounded comfort.",
     size: "8 oz",
     price: 15,
-    image: "/products/bottle.jpg",
+    image: "/products/driftwood-haven.jpg",
     position: "object-center",
   },
   {
@@ -110,7 +110,7 @@ const products: Product[] = [
     mood: "Cozy autumn indulgence, velvety warmth, and festive comfort.",
     size: "8 oz",
     price: 15,
-    image: "/products/bottle.jpg",
+    image: "/products/veloura-pumpkin.jpg",
     position: "object-center",
   },
   {
@@ -120,7 +120,7 @@ const products: Product[] = [
     mood: "Warm and cozy with rich caramel notes, perfect for Fall and Winter.",
     size: "8 oz",
     price: 15,
-    image: "/products/bottle.jpg",
+    image: "/products/boozy-bourben.jpg",
     position: "object-center",
   },
 ];
@@ -507,7 +507,7 @@ function CandleStore() {
           >
             <img
               loading="lazy"
-              src={"/products/bottle.jpg"}
+              src={"/products/ambrevelle.jpg"}
               alt="Ambrevelle candle"
               width={480}
               height={620}
