@@ -406,10 +406,6 @@ function CandleStore() {
               From quiet mornings to intimate evenings, our handmade candles are imagined as
               companions to the memories, emotions, and spaces that make life meaningful.
             </p>
-            <p className="mt-5 leading-7 text-muted-foreground">
-              Our story is also inspired by the warmth, individuality, and cultural identity of our
-              founder's Haitian and Caribbean heritage.
-            </p>
           </motion.div>
         </div>
       </section>
