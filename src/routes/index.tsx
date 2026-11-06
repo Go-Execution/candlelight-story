@@ -115,12 +115,12 @@ const products: Product[] = [
   },
   {
     id: 7,
-    name: "Boozy Bourben",
+    name: "Boozy Bourbon",
     fragrance: "Butterscotch Bourbon & Sweet Honey",
     mood: "Warm and cozy with rich caramel notes, perfect for Fall and Winter.",
     size: "8 oz",
     price: 15,
-    image: "/products/boozy-bourben.jpg",
+    image: "/products/boozy-bourbon.jpg",
     position: "object-center",
   },
 ];
