@@ -34,7 +34,6 @@ Owner: Cynthia Osias
 
 Email: [info@madeleineluciacandle.com](mailto:info@madeleineluciacandle.com)
 
-Phone: +1 518 965 4205
 
 Main Business Goals:
 
@@ -687,9 +686,6 @@ Email:
 
 [info@madeleineluciacandle.com](mailto:info@madeleineluciacandle.com)
 
-Phone:
-
-+1 518 965 4205
 
 CONTACT FORM:
 
@@ -767,7 +763,6 @@ Contact:
 
 [info@madeleineluciacandle.com](mailto:info@madeleineluciacandle.com)
 
-+1 518 965 4205
 
 Add tasteful Instagram and Pinterest icon placeholders without inventing official social profile links.
 

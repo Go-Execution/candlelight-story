@@ -798,9 +798,6 @@ function ContactSection() {
             >
               info@madeleineluciacandle.com
             </a>
-            <a href="tel:+15189654205" className="block">
-              +1 518 965 4205
-            </a>
           </div>
         </motion.div>
         {sent ? (
@@ -944,9 +941,6 @@ function Footer({ nav }: { nav: { label: string; id: string }[] }) {
             className="mt-5 block text-sm text-primary-foreground/75"
           >
             info@madeleineluciacandle.com
-          </a>
-          <a href="tel:+15189654205" className="mt-3 block text-sm text-primary-foreground/75">
-            +1 518 965 4205
           </a>
           <div className="mt-6 flex gap-3">
             <span
