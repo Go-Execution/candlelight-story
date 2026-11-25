@@ -3,19 +3,23 @@ import {
   ArrowRight,
   Check,
   CheckCircle2,
+  CloudUpload,
   CreditCard,
+  Database,
   DollarSign,
   Download,
   KeyRound,
   Mail,
   Package,
   Plus,
+  RefreshCw,
   RotateCcw,
   ShoppingBag,
   Trash2,
   TrendingUp,
+  XCircle,
 } from "lucide-react";
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -31,6 +35,7 @@ import {
   ORDER_STATUS_LABELS,
   resetStoreToDefaults,
   saveProduct,
+  seedCatalogToSupabase,
   showStoreToast,
   togglePromoCode,
   updateInquiryStatus,
@@ -38,6 +43,11 @@ import {
   upsertPromoCode,
   useEcommerceStore,
 } from "@/lib/ecommerce-store";
+import {
+  fetchIntegrationHealth,
+  IntegrationHealthStatus,
+  isSupabaseConfigured,
+} from "@/lib/supabase";
 
 // ------------------------------------------------------------
 // 1. OVERVIEW & ANALYTICS TAB
@@ -526,10 +536,14 @@ export function AdminCustomersTab() {
 }
 
 // ------------------------------------------------------------
-// 3. STRIPE CONFIGURATION, SHIPPING & PROMO SETTINGS TAB
+// 3. SUPABASE + STRIPE INTEGRATION & STORE SETTINGS TAB
 // ------------------------------------------------------------
 export function AdminStripeSettingsTab() {
   const state = useEcommerceStore();
+  const [health, setHealth] = useState<IntegrationHealthStatus | null>(null);
+  const [checkingHealth, setCheckingHealth] = useState(false);
+  const [seedingCloud, setSeedingCloud] = useState(false);
+
   const [promoCode, setPromoCode] = useState("");
   const [promoType, setPromoType] = useState<"percentage" | "fixed" | "free_shipping">(
     "percentage",
@@ -537,6 +551,24 @@ export function AdminStripeSettingsTab() {
   const [promoValue, setPromoValue] = useState("10");
   const [promoMin, setPromoMin] = useState("0");
   const [promoDesc, setPromoDesc] = useState("");
+
+  const refreshHealth = async () => {
+    setCheckingHealth(true);
+    const res = await fetchIntegrationHealth();
+    setHealth(res);
+    setCheckingHealth(false);
+  };
+
+  useEffect(() => {
+    void refreshHealth();
+  }, []);
+
+  const handleSeedSupabase = async () => {
+    setSeedingCloud(true);
+    const res = await seedCatalogToSupabase();
+    setSeedingCloud(false);
+    showStoreToast(res.message);
+  };
 
   const handleAddPromo = (e: FormEvent) => {
     e.preventDefault();
@@ -555,56 +587,111 @@ export function AdminStripeSettingsTab() {
     showStoreToast("Promo code saved");
   };
 
+  const webhookEndpoint =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/api/stripe/webhook`
+      : "/api/stripe/webhook";
+
   return (
     <div className="space-y-8">
-      <div>
-        <p className="text-[10px] font-semibold uppercase tracking-[.24em] text-earth">
-          Payments, Shipping & Architecture
-        </p>
-        <h2 className="mt-1 font-display text-4xl text-midnight">
-          Stripe Integration & Store Settings
-        </h2>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[.24em] text-earth">
+            Cloud Backend, Payments & Store Rules
+          </p>
+          <h2 className="mt-1 font-display text-4xl text-midnight">
+            Supabase & Stripe Configuration
+          </h2>
+        </div>
+
+        <button
+          type="button"
+          disabled={checkingHealth}
+          onClick={() => {
+            void refreshHealth();
+          }}
+          className="inline-flex items-center gap-2 border border-midnight bg-ivory px-4 py-2.5 text-[10px] font-semibold uppercase tracking-[.15em] text-midnight hover:bg-midnight hover:text-primary-foreground"
+        >
+          <RefreshCw size={13} className={checkingHealth ? "animate-spin" : ""} />
+          Re-Check Keys Status
+        </button>
       </div>
 
-      {/* Phased Rollout Tracker */}
-      <div className="border border-midnight/25 bg-powder/35 p-6">
-        <p className="text-[10px] font-semibold uppercase tracking-[.2em] text-midnight">
-          E-Commerce Phased Implementation Roadmap
-        </p>
-        <div className="mt-4 grid gap-4 md:grid-cols-3">
-          <div className="border border-midnight bg-ivory p-4">
-            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-midnight">
-              <CheckCircle2 size={15} className="text-earth" /> Phase 1 — Active Now
-            </div>
-            <p className="mt-2 text-xs leading-5 text-charcoal">
-              Complete Storefront E-Commerce, Cart, Checkout Flow, Order Tracking, and Full Admin
-              Order & Inventory Dashboard + Stripe Payment Link support.
+      {/* Live Environment Keys Health Grid */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="border border-border bg-card p-6">
+          <div className="flex items-center justify-between">
+            <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[.16em] text-midnight">
+              <Database size={15} className="text-earth" /> Supabase Database & Auth
             </p>
+            {isSupabaseConfigured && (
+              <button
+                type="button"
+                disabled={seedingCloud}
+                onClick={() => {
+                  void handleSeedSupabase();
+                }}
+                className="inline-flex items-center gap-1.5 bg-midnight px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-primary-foreground hover:bg-earth"
+              >
+                <CloudUpload size={12} />
+                {seedingCloud ? "Syncing..." : "Push Catalog to Supabase"}
+              </button>
+            )}
           </div>
-          <div className="border border-border bg-ivory/80 p-4">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-midnight">
-              <span className="grid size-5 place-items-center rounded-full bg-midnight text-[10px] text-ivory">
-                2
-              </span>
-              Phase 2 — Backend & Database
-            </div>
-            <p className="mt-2 text-xs leading-5 text-muted-foreground">
-              Persistent database tables (Orders, Products, Customers, Admin Auth) + server API
-              handlers for multi-device cloud persistence.
-            </p>
+
+          <div className="mt-4 space-y-2.5 text-xs">
+            <StatusRow
+              label="VITE_SUPABASE_URL"
+              ok={Boolean(health?.supabase.urlConfigured)}
+            />
+            <StatusRow
+              label="VITE_SUPABASE_ANON_KEY"
+              ok={Boolean(health?.supabase.anonKeyConfigured)}
+            />
+            <StatusRow
+              label="SUPABASE_SERVICE_ROLE_KEY (Server Webhooks)"
+              ok={Boolean(health?.supabase.serviceRoleConfigured)}
+            />
           </div>
-          <div className="border border-border bg-ivory/80 p-4">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-midnight">
-              <span className="grid size-5 place-items-center rounded-full bg-midnight text-[10px] text-ivory">
-                3
-              </span>
-              Phase 3 — Live Stripe Keys & Webhooks
-            </div>
-            <p className="mt-2 text-xs leading-5 text-muted-foreground">
-              Connect server-side <code>STRIPE_SECRET_KEY</code> &{" "}
-              <code>STRIPE_WEBHOOK_SECRET</code> for automated Checkout Sessions and real-time paid
-              order webhooks.
+          <p className="mt-4 text-[11px] leading-5 text-muted-foreground">
+            Run <code>supabase/migrations/001_ecommerce_schema.sql</code> once in your Supabase SQL
+            Editor to create all tables, RLS policies, and seed all 7 candles.
+          </p>
+        </div>
+
+        <div className="border border-border bg-card p-6">
+          <div className="flex items-center justify-between">
+            <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[.16em] text-midnight">
+              <CreditCard size={15} className="text-earth" /> Stripe Live Checkout & Webhooks
             </p>
+            <span className="border border-border bg-ivory px-2.5 py-0.5 text-[10px] font-semibold uppercase">
+              Mode: {health?.stripe.mode ?? "checking"}
+            </span>
+          </div>
+
+          <div className="mt-4 space-y-2.5 text-xs">
+            <StatusRow
+              label="VITE_STRIPE_PUBLISHABLE_KEY (pk_...)"
+              ok={Boolean(health?.stripe.publishableKeyConfigured)}
+            />
+            <StatusRow
+              label="STRIPE_SECRET_KEY (sk_... Server Only)"
+              ok={Boolean(health?.stripe.secretKeyConfigured)}
+            />
+            <StatusRow
+              label="STRIPE_WEBHOOK_SECRET (whsec_...)"
+              ok={Boolean(health?.stripe.webhookSecretConfigured)}
+            />
+          </div>
+
+          <div className="mt-4 border-t border-border pt-3 text-[11px] text-muted-foreground">
+            <span className="font-semibold text-midnight">Webhook URL:</span>{" "}
+            <code className="break-all bg-ivory px-1.5 py-0.5 text-midnight">
+              {webhookEndpoint}
+            </code>
+            <br />
+            <span>Listen to event: </span>
+            <code>checkout.session.completed</code>
           </div>
         </div>
       </div>
@@ -613,13 +700,13 @@ export function AdminStripeSettingsTab() {
       <div className="border border-border bg-card p-6">
         <div className="flex items-center gap-2">
           <CreditCard size={18} className="text-earth" />
-          <h3 className="font-display text-2xl text-midnight">Stripe Checkout Configuration</h3>
+          <h3 className="font-display text-2xl text-midnight">Stripe Checkout Mode & Links</h3>
         </div>
 
         <div className="mt-5 grid gap-5 md:grid-cols-2">
           <label className="block text-xs">
             <span className="mb-1.5 block font-semibold uppercase tracking-wider text-charcoal">
-              Checkout Payment Mode
+              Checkout Payment Flow
             </span>
             <select
               value={state.settings.stripeCheckoutMode}
@@ -634,7 +721,7 @@ export function AdminStripeSettingsTab() {
               className="w-full border border-border bg-ivory px-3.5 py-2.5 outline-none focus:border-midnight"
             >
               <option value="stripe_checkout_preview">
-                Stripe Checkout Session Flow (Ready for Phase 3 Backend API)
+                Dynamic Stripe Checkout Session API (/api/stripe/create-checkout-session)
               </option>
               <option value="stripe_payment_link">
                 Direct Stripe Hosted Payment Link Redirect (buy.stripe.com)
@@ -659,7 +746,7 @@ export function AdminStripeSettingsTab() {
 
           <label className="block text-xs md:col-span-2">
             <span className="mb-1.5 flex items-center gap-1.5 font-semibold uppercase tracking-wider text-charcoal">
-              <KeyRound size={13} className="text-earth" /> Stripe Publishable Key (Public{" "}
+              <KeyRound size={13} className="text-earth" /> Public Publishable Key Reference (
               <code>pk_test_...</code> or <code>pk_live_...</code>)
             </span>
             <input
@@ -668,25 +755,15 @@ export function AdminStripeSettingsTab() {
               onChange={(e) =>
                 updateStoreSettings({ stripePublishableKey: e.target.value.trim() })
               }
-              placeholder="pk_live_... or pk_test_... (Never enter sk_secret keys in browser UI)"
+              placeholder="pk_live_... (Keep sk_live_... strictly inside .env.local / Supabase Secrets)"
               className="w-full border border-border bg-ivory px-3.5 py-2.5 font-mono text-xs outline-none focus:border-midnight"
             />
-            <span className="mt-1.5 block text-[11px] text-muted-foreground">
-              Security Note: Secret keys (<code>STRIPE_SECRET_KEY</code> and{" "}
-              <code>STRIPE_WEBHOOK_SECRET</code>) belong strictly in server environment variables
-              during Phase 2/3—never in frontend code.
-            </span>
           </label>
         </div>
 
-        {/* Quick Per-Product Stripe Payment Link Table */}
         <div className="mt-6 border-t border-border pt-5">
           <p className="text-[10px] font-semibold uppercase tracking-[.16em] text-earth">
-            Quick Per-Candle Stripe Payment Links
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Paste individual <code>https://buy.stripe.com/...</code> links per scent to enable
-            1-click Stripe Express links on product pages right away.
+            Optional Per-Candle Stripe Payment Links
           </p>
           <div className="mt-4 space-y-2.5">
             {state.products.map((prod) => (
@@ -710,16 +787,16 @@ export function AdminStripeSettingsTab() {
                       showStoreToast(`Stripe link updated for ${prod.name}`);
                     }
                   }}
-                  placeholder="https://buy.stripe.com/..."
+                  placeholder="https://buy.stripe.com/... (leave blank to use Dynamic API Session)"
                   className="border border-border bg-card px-3 py-1.5 font-mono text-xs outline-none focus:border-midnight"
                 />
                 <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
                   {prod.stripePaymentLink ? (
                     <span className="inline-flex items-center gap-1 font-semibold text-earth">
-                      <Check size={12} /> Active
+                      <Check size={12} /> Direct Link
                     </span>
                   ) : (
-                    "Auto Session"
+                    "API Session"
                   )}
                 </span>
               </div>
@@ -733,7 +810,7 @@ export function AdminStripeSettingsTab() {
         <h3 className="font-display text-2xl text-midnight">
           Shipping Rates, Tax & Storefront Banner
         </h3>
-        <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4 text-xs">
+        <div className="mt-5 grid gap-4 text-xs sm:grid-cols-2 lg:grid-cols-4">
           <label className="block">
             <span className="mb-1 block font-semibold uppercase tracking-wider text-charcoal">
               Free Shipping Min ($)
@@ -830,7 +907,7 @@ export function AdminStripeSettingsTab() {
       <div className="border border-border bg-card p-6">
         <h3 className="font-display text-2xl text-midnight">Promo & Discount Codes</h3>
 
-        <form onSubmit={handleAddPromo} className="mt-4 grid gap-3 sm:grid-cols-5 text-xs">
+        <form onSubmit={handleAddPromo} className="mt-4 grid gap-3 text-xs sm:grid-cols-5">
           <input
             required
             type="text"
@@ -919,24 +996,41 @@ export function AdminStripeSettingsTab() {
       {/* Reset Demo Data */}
       <div className="flex items-center justify-between border border-border bg-cream/60 p-5 text-xs">
         <div>
-          <p className="font-semibold text-midnight">Reset Local Store Sandbox Data</p>
+          <p className="font-semibold text-midnight">Reset Local Cache Data</p>
           <p className="text-muted-foreground">
-            Restore initial sample orders, default stock counts, and default settings.
+            Clear local browser cache and reload from Supabase / initial defaults.
           </p>
         </div>
         <button
           type="button"
           onClick={() => {
-            if (window.confirm("Reset all demo orders and inventory back to defaults?")) {
+            if (window.confirm("Reset local browser cache back to defaults?")) {
               resetStoreToDefaults();
-              showStoreToast("Store data reset to defaults");
+              showStoreToast("Local store cache reset");
             }
           }}
           className="inline-flex items-center gap-1.5 border border-midnight bg-ivory px-4 py-2.5 text-[10px] font-semibold uppercase tracking-[.14em] text-midnight hover:bg-midnight hover:text-primary-foreground"
         >
-          <RotateCcw size={13} /> Reset Data
+          <RotateCcw size={13} /> Reset Cache
         </button>
       </div>
+    </div>
+  );
+}
+
+function StatusRow({ label, ok }: { label: string; ok: boolean }) {
+  return (
+    <div className="flex items-center justify-between border border-border/60 bg-ivory px-3 py-2">
+      <code className="text-[11px] text-charcoal">{label}</code>
+      {ok ? (
+        <span className="inline-flex items-center gap-1 font-semibold text-emerald-800">
+          <CheckCircle2 size={13} /> Configured
+        </span>
+      ) : (
+        <span className="inline-flex items-center gap-1 text-amber-800">
+          <XCircle size={13} /> Not Set Yet
+        </span>
+      )}
     </div>
   );
 }

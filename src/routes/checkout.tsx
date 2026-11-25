@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { motion } from "motion/react";
 import {
+  AlertCircle,
   ArrowLeft,
   Check,
   CreditCard,
@@ -15,8 +16,10 @@ import {
   Trash2,
   Truck,
 } from "lucide-react";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import {
+  attachStripeSessionToOrder,
+  clearCart,
   createStoreOrder,
   evaluatePromoCode,
   formatMoney,
@@ -24,8 +27,10 @@ import {
   removeFromCart,
   ShippingMethodType,
   updateCartQuantity,
+  updateOrderPaymentStatus,
   useEcommerceStore,
 } from "@/lib/ecommerce-store";
+import { initiateLiveStripeCheckout } from "@/lib/supabase";
 import { Eyebrow } from "@/components/shop/StorefrontChrome";
 
 export const Route = createFileRoute("/checkout")({
@@ -57,6 +62,17 @@ function CheckoutPage() {
   const [appliedCode, setAppliedCode] = useState("");
   const [promoFeedback, setPromoFeedback] = useState("");
   const [isRedirectingStripe, setIsRedirectingStripe] = useState(false);
+  const [checkoutError, setCheckoutError] = useState("");
+  const [cancelledNotice, setCancelledNotice] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("stripe_status") === "cancelled") {
+        setCancelledNotice(true);
+      }
+    }
+  }, []);
 
   const promoResult = evaluatePromoCode(appliedCode, subtotal, state);
   const discountAmount = promoResult.valid ? promoResult.discountAmount : 0;
@@ -78,7 +94,6 @@ function CheckoutPage() {
     Math.round(discountedSubtotal * (state.settings.taxRatePercent / 100) * 100) / 100;
   const total = Math.round((discountedSubtotal + shippingCost + taxAmount) * 100) / 100;
 
-  // Determine if a direct Stripe Payment Link applies
   const singleLineLink =
     lines.length === 1 && lines[0] && lines[0].product.stripePaymentLink
       ? lines[0].product.stripePaymentLink
@@ -107,15 +122,18 @@ function CheckoutPage() {
     }
   };
 
-  const handlePlaceOrder = (e: FormEvent) => {
+  const handlePlaceOrder = async (e: FormEvent) => {
     e.preventDefault();
     if (lines.length === 0 || isRedirectingStripe) return;
 
+    setCheckoutError("");
     setIsRedirectingStripe(true);
 
-    setTimeout(() => {
+    try {
       const hasExternalLink = Boolean(activeStripeLink);
-      const created = createStoreOrder({
+
+      // 1. Create order in Supabase + local store (keep cart until redirect/completion succeeds)
+      const created = await createStoreOrder({
         customer: {
           fullName: fullName.trim(),
           email: email.trim(),
@@ -132,8 +150,9 @@ function CheckoutPage() {
         promoCode: appliedCode,
         giftNote: includeGiftNote ? giftNote : "",
         paymentMethod: hasExternalLink ? "stripe_payment_link" : "stripe_checkout",
-        paymentStatus: hasExternalLink ? "awaiting_stripe" : "paid",
+        paymentStatus: "awaiting_stripe",
         stripePaymentLinkUrl: activeStripeLink,
+        clearShoppingBag: false,
       });
 
       if (!created) {
@@ -141,20 +160,68 @@ function CheckoutPage() {
         return;
       }
 
+      // 2. If user explicitly configured a direct Stripe Payment Link (buy.stripe.com)
       if (hasExternalLink) {
-        window.open(activeStripeLink, "_blank", "noopener,noreferrer");
+        clearCart();
+        const sep = activeStripeLink.includes("?") ? "&" : "?";
+        const linkWithMeta = `${activeStripeLink}${sep}client_reference_id=${encodeURIComponent(created.id)}&prefilled_email=${encodeURIComponent(created.customer.email)}`;
+        window.open(linkWithMeta, "_blank", "noopener,noreferrer");
+        void navigate({
+          to: "/order-confirmation/$orderId",
+          params: { orderId: created.id },
+        });
+        return;
       }
 
+      // 3. Attempt live server/Supabase Edge Function Stripe Checkout Session
+      const stripeRes = await initiateLiveStripeCheckout({
+        orderId: created.id,
+        customerEmail: created.customer.email,
+        items: lines.map((l) => ({
+          name: l.product.name,
+          fragrance: l.product.fragrance,
+          size: l.product.size,
+          price: l.product.price,
+          quantity: l.quantity,
+          stripePriceId: l.product.stripePriceId,
+        })),
+        shippingCost,
+        shippingMethod,
+        discountCode: created.discountCode,
+        discountAmount: created.discountAmount,
+        taxAmount: created.taxAmount,
+      });
+
+      if (stripeRes.status === "redirect") {
+        attachStripeSessionToOrder(created.id, stripeRes.sessionId);
+        clearCart();
+        window.location.assign(stripeRes.url);
+        return;
+      }
+
+      if (stripeRes.status === "error") {
+        setIsRedirectingStripe(false);
+        setCheckoutError(`Stripe Error: ${stripeRes.message}`);
+        return;
+      }
+
+      // 4. Fallback when STRIPE_SECRET_KEY hasn't been added to .env.local yet
+      updateOrderPaymentStatus(created.id, "paid");
+      clearCart();
       void navigate({
         to: "/order-confirmation/$orderId",
         params: { orderId: created.id },
       });
-    }, 850);
+    } catch (err) {
+      setIsRedirectingStripe(false);
+      setCheckoutError(
+        err instanceof Error ? err.message : "Could not initiate checkout. Please try again.",
+      );
+    }
   };
 
   return (
     <main className="min-h-screen bg-ivory">
-      {/* Minimal Distraction-Free Checkout Header */}
       <header className="border-b border-border bg-[#FDF1EB]">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-3 md:px-10">
           <Link
@@ -177,6 +244,13 @@ function CheckoutPage() {
         </div>
       </header>
 
+      {cancelledNotice && (
+        <div className="border-b border-amber-300 bg-amber-50 px-5 py-3 text-center text-xs text-amber-950">
+          Your Stripe payment window was closed before completion — your shopping bag is still
+          saved below whenever you are ready.
+        </div>
+      )}
+
       {lines.length === 0 ? (
         <div className="mx-auto flex min-h-[65vh] max-w-lg flex-col items-center justify-center px-5 text-center">
           <ShoppingBag size={42} strokeWidth={1.1} className="text-earth" />
@@ -194,17 +268,28 @@ function CheckoutPage() {
         </div>
       ) : (
         <form
-          onSubmit={handlePlaceOrder}
+          onSubmit={(e) => {
+            void handlePlaceOrder(e);
+          }}
           className="mx-auto grid max-w-7xl gap-10 px-5 py-12 md:px-10 lg:grid-cols-[1.15fr_.85fr] lg:gap-16 lg:py-16"
         >
-          {/* Left Column: Customer, Address, Shipping & Stripe Payment */}
           <div className="space-y-10">
+            {checkoutError && (
+              <div className="flex items-start gap-3 border border-red-300 bg-red-50 p-4 text-xs text-red-900">
+                <AlertCircle size={16} className="mt-0.5 shrink-0" />
+                <div>
+                  <p className="font-semibold">Payment Connection Issue</p>
+                  <p className="mt-0.5">{checkoutError}</p>
+                </div>
+              </div>
+            )}
+
             {/* 1. Contact */}
             <section className="border border-border bg-card p-6 md:p-8">
               <Eyebrow>Step 01</Eyebrow>
               <h2 className="mt-2 font-display text-3xl text-midnight">Contact Information</h2>
               <p className="mt-1 text-xs text-muted-foreground">
-                Used exclusively for your order confirmation and shipping tracking updates.
+                Used exclusively for your Stripe receipt and shipping tracking updates.
               </p>
               <div className="mt-5 grid gap-4 sm:grid-cols-2">
                 <label className="block">
@@ -389,7 +474,6 @@ function CheckoutPage() {
                 </label>
               </div>
 
-              {/* Complimentary Gift Note */}
               <div className="mt-6 border-t border-border pt-5">
                 <label className="flex cursor-pointer items-center gap-2.5 text-sm font-medium text-midnight">
                   <input
@@ -435,13 +519,12 @@ function CheckoutPage() {
                   <div>
                     <p className="text-sm font-semibold text-midnight">
                       {activeStripeLink
-                        ? "Stripe Hosted Payment Link Redirect"
-                        : "Stripe Hosted Checkout"}
+                        ? "Stripe Hosted Payment Link"
+                        : "Stripe Hosted Checkout Session"}
                     </p>
                     <p className="mt-1 text-xs leading-5 text-charcoal/80">
-                      {activeStripeLink
-                        ? "Clicking pay below creates your order record and opens your secure Stripe Payment Link in a new tab to complete card or Apple Pay authorization."
-                        : "All transactions are encrypted end-to-end via Stripe. Card numbers never touch our servers. (Frontend Phase 1 active — live server session keys connect in Phase 2/3)."}
+                      Your order is saved to our database and redirected securely to Stripe to
+                      complete card, Apple Pay, Google Pay, or Stripe Link authorization.
                     </p>
                   </div>
                 </div>
@@ -453,7 +536,7 @@ function CheckoutPage() {
                 className="mt-6 flex w-full items-center justify-center gap-3 bg-midnight py-4 text-xs font-semibold uppercase tracking-[.18em] text-primary-foreground transition hover:bg-earth disabled:opacity-60"
               >
                 {isRedirectingStripe ? (
-                  <span>Connecting to Stripe Checkout...</span>
+                  <span>Redirecting to Secure Stripe Checkout...</span>
                 ) : activeStripeLink ? (
                   <>
                     <span>Pay {formatMoney(total)} via Stripe Link</span>
@@ -468,8 +551,8 @@ function CheckoutPage() {
               </button>
 
               <p className="mt-3 flex items-center justify-center gap-1.5 text-center text-[11px] text-muted-foreground">
-                <ShieldCheck size={14} className="text-earth" /> Instant order confirmation &
-                real-time tracking included
+                <ShieldCheck size={14} className="text-earth" /> 256-bit TLS encrypted Stripe
+                checkout & live order tracking
               </p>
             </section>
           </div>
@@ -563,7 +646,7 @@ function CheckoutPage() {
                 {promoFeedback && (
                   <p
                     className={`mt-2 flex items-center gap-1.5 text-xs ${
-                      promoResult.valid ? "text-earth font-medium" : "text-red-700"
+                      promoResult.valid ? "font-medium text-earth" : "text-red-700"
                     }`}
                   >
                     {promoResult.valid && <Check size={13} />}
@@ -629,10 +712,10 @@ function CheckoutPage() {
               <div className="max-w-md bg-ivory p-8 text-center shadow-2xl">
                 <div className="mx-auto size-10 animate-spin rounded-full border-2 border-midnight border-t-transparent" />
                 <h3 className="mt-5 font-display text-3xl text-midnight">
-                  Authorizing via Stripe...
+                  Connecting to Stripe...
                 </h3>
                 <p className="mt-2 text-xs text-muted-foreground">
-                  Creating your order receipt and reserving your hand-poured candles.
+                  Preparing your encrypted Stripe payment session and reserving your candles.
                 </p>
               </div>
             </motion.div>

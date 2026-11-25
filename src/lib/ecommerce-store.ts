@@ -1,4 +1,20 @@
 import { useEffect, useSyncExternalStore } from "react";
+import {
+  DbInquiryRow,
+  DbOrderRow,
+  DbProductRow,
+  DbPromoRow,
+  DbSettingsRow,
+  isSupabaseConfigured,
+  mapInquiryFromRow,
+  mapOrderFromRow,
+  mapOrderToRow,
+  mapProductFromRow,
+  mapProductToRow,
+  mapPromoFromRow,
+  mapSettingsFromRow,
+  supabase,
+} from "./supabase";
 
 export type ProductCategory =
   | "Signature"
@@ -172,6 +188,7 @@ export interface EcommerceState {
   subscribers: NewsletterSubscriber[];
   settings: StoreSettings;
   toastMessage: string;
+  supabaseSynced: boolean;
 }
 
 export const INITIAL_PRODUCTS: Product[] = [
@@ -203,7 +220,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     image: "/products/summer-sunset.jpg",
     position: "object-center",
     stripePaymentLink: "",
-    stripePriceId: "price_mlc_summer_sunset_8oz",
+    stripePriceId: "",
   },
   {
     id: 2,
@@ -233,7 +250,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     image: "/products/ambrevelle.jpg",
     position: "object-center",
     stripePaymentLink: "",
-    stripePriceId: "price_mlc_ambrevelle_8oz",
+    stripePriceId: "",
   },
   {
     id: 3,
@@ -263,7 +280,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     image: "/products/autumn-apple.jpg",
     position: "object-center",
     stripePaymentLink: "",
-    stripePriceId: "price_mlc_autumn_apple_8oz",
+    stripePriceId: "",
   },
   {
     id: 4,
@@ -293,7 +310,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     image: "/products/caribbean-ocean.jpg",
     position: "object-center",
     stripePaymentLink: "",
-    stripePriceId: "price_mlc_caribbean_ocean_8oz",
+    stripePriceId: "",
   },
   {
     id: 5,
@@ -323,7 +340,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     image: "/products/driftwood-haven.jpg",
     position: "object-center",
     stripePaymentLink: "",
-    stripePriceId: "price_mlc_driftwood_haven_8oz",
+    stripePriceId: "",
   },
   {
     id: 6,
@@ -353,7 +370,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     image: "/products/veloura-pumpkin.jpg",
     position: "object-center",
     stripePaymentLink: "",
-    stripePriceId: "price_mlc_veloura_pumpkin_8oz",
+    stripePriceId: "",
   },
   {
     id: 7,
@@ -383,7 +400,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     image: "/products/boozy-bourbon.jpg",
     position: "object-center",
     stripePaymentLink: "",
-    stripePriceId: "price_mlc_boozy_bourbon_8oz",
+    stripePriceId: "",
   },
 ];
 
@@ -725,83 +742,13 @@ export const INITIAL_ORDERS: Order[] = [
       },
     ],
   },
-  {
-    id: "MLC-1041",
-    createdAt: "2026-11-15T18:50:00.000Z",
-    updatedAt: "2026-11-18T14:12:00.000Z",
-    customer: {
-      fullName: "Simone Beaumont",
-      email: "simone.b@example.com",
-    },
-    shippingAddress: {
-      street: "735 Lake Shore Dr",
-      apartment: "Unit 19C",
-      city: "Chicago",
-      state: "IL",
-      postalCode: "60611",
-      country: "United States",
-    },
-    items: [
-      {
-        productId: 2,
-        sku: "MLC-8OZ-002",
-        name: "Ambrevelle",
-        fragrance: "Golden Amber & Warm Vanilla",
-        size: "8 oz",
-        price: 15,
-        quantity: 4,
-        image: "/products/ambrevelle.jpg",
-      },
-    ],
-    shippingMethod: "standard",
-    subtotal: 60,
-    discountCode: "",
-    discountAmount: 0,
-    shippingCost: 0,
-    taxAmount: 0,
-    total: 60,
-    giftNote: "Bridal party thank-you gifts.",
-    orderStatus: "delivered",
-    paymentStatus: "paid",
-    paymentMethod: "stripe_checkout",
-    stripeSessionId: "cs_live_e63b4019d832a1c7",
-    stripePaymentLinkUrl: "",
-    trackingCarrier: "USPS",
-    trackingNumber: "9405511899223841109822",
-    internalNotes: "Repeat VIP customer.",
-    timeline: [
-      {
-        id: "evt-1041-1",
-        status: "pending",
-        label: "Order Placed & Paid via Stripe",
-        note: "Stripe Checkout completed ($60.00).",
-        timestamp: "2026-11-15T18:50:00.000Z",
-      },
-      {
-        id: "evt-1041-2",
-        status: "shipped",
-        label: "Shipped via USPS",
-        note: "Tracking #9405511899223841109822.",
-        timestamp: "2026-11-16T15:20:00.000Z",
-      },
-      {
-        id: "evt-1041-3",
-        status: "delivered",
-        label: "Delivered",
-        note: "Delivered to parcel locker.",
-        timestamp: "2026-11-18T14:12:00.000Z",
-      },
-    ],
-  },
 ];
 
 export const INITIAL_INQUIRIES: CustomerInquiry[] = [
   {
     id: "INQ-201",
     createdAt: "2026-11-24T16:12:00.000Z",
-    name: "claire.montgomery@example.com".replace("@example.com", "")
-      ? "Claire Montgomery"
-      : "Claire Montgomery",
+    name: "Claire Montgomery",
     email: "claire.montgomery@example.com",
     inquiryType: "Special Request",
     message:
@@ -836,6 +783,7 @@ const DEFAULT_STATE: EcommerceState = {
   ],
   settings: INITIAL_SETTINGS,
   toastMessage: "",
+  supabaseSynced: false,
 };
 
 let currentState: EcommerceState = DEFAULT_STATE;
@@ -878,6 +826,172 @@ function parseSavedState(raw: string | null): Partial<EcommerceState> | null {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Supabase Cloud Fetch & Realtime Subscriptions
+// ---------------------------------------------------------------------------
+export async function syncFromSupabase() {
+  if (!supabase) return;
+
+  try {
+    const [prodRes, promoRes, settingsRes] = await Promise.all([
+      supabase.from("products").select("*").order("id", { ascending: true }),
+      supabase.from("promo_codes").select("*").order("created_at", { ascending: false }),
+      supabase.from("store_settings").select("*").eq("id", 1).maybeSingle(),
+    ]);
+
+    const nextProducts =
+      !prodRes.error && Array.isArray(prodRes.data) && prodRes.data.length > 0
+        ? (prodRes.data as DbProductRow[]).map(mapProductFromRow)
+        : null;
+
+    const nextPromos =
+      !promoRes.error && Array.isArray(promoRes.data) && promoRes.data.length > 0
+        ? (promoRes.data as DbPromoRow[]).map(mapPromoFromRow)
+        : null;
+
+    const nextSettings =
+      !settingsRes.error && settingsRes.data
+        ? mapSettingsFromRow(settingsRes.data as DbSettingsRow)
+        : null;
+
+    if (nextProducts || nextPromos || nextSettings) {
+      updateState((prev) => ({
+        ...prev,
+        products: nextProducts ?? prev.products,
+        promoCodes: nextPromos ?? prev.promoCodes,
+        settings: nextSettings ?? prev.settings,
+        supabaseSynced: true,
+      }));
+    }
+
+    await refreshAdminCloudData();
+  } catch {
+    // Keep local state if tables are not created yet
+  }
+}
+
+export async function refreshAdminCloudData() {
+  if (!supabase) return;
+  try {
+    const [ordersRes, inqRes, subRes] = await Promise.all([
+      supabase.from("orders").select("*").order("created_at", { ascending: false }),
+      supabase.from("customer_inquiries").select("*").order("created_at", { ascending: false }),
+      supabase
+        .from("newsletter_subscribers")
+        .select("*")
+        .order("joined_at", { ascending: false }),
+    ]);
+
+    const hasOrders = !ordersRes.error && Array.isArray(ordersRes.data);
+    const hasInq = !inqRes.error && Array.isArray(inqRes.data);
+    const hasSubs = !subRes.error && Array.isArray(subRes.data);
+
+    if (hasOrders || hasInq || hasSubs) {
+      updateState((prev) => ({
+        ...prev,
+        orders:
+          hasOrders && ordersRes.data
+            ? (ordersRes.data as DbOrderRow[]).map(mapOrderFromRow)
+            : prev.orders,
+        inquiries:
+          hasInq && inqRes.data
+            ? (inqRes.data as DbInquiryRow[]).map(mapInquiryFromRow)
+            : prev.inquiries,
+        subscribers:
+          hasSubs && subRes.data
+            ? (subRes.data as Array<{ email: string; joined_at: string }>).map((s) => ({
+                email: s.email,
+                joinedAt: s.joined_at,
+              }))
+            : prev.subscribers,
+        supabaseSynced: true,
+      }));
+    }
+  } catch {
+    // Silent fallback when anon user has no admin SELECT rights
+  }
+}
+
+export async function lookupCloudOrder(
+  orderId: string,
+  email = "",
+): Promise<Order | null> {
+  const localMatch = currentState.orders.find((o) => {
+    if (o.id.toUpperCase() !== orderId.trim().toUpperCase()) return false;
+    if (!email.trim()) return true;
+    return o.customer.email.toLowerCase() === email.trim().toLowerCase();
+  });
+
+  if (!supabase) {
+    return localMatch ?? null;
+  }
+
+  try {
+    const { data, error } = await supabase.rpc("lookup_order", {
+      p_order_id: orderId.trim(),
+      p_email: email.trim() || null,
+    });
+    if (!error && Array.isArray(data) && data[0]) {
+      const mapped = mapOrderFromRow(data[0] as DbOrderRow);
+      // Merge into local cache so UI stays reactive
+      updateState((prev) => {
+        const exists = prev.orders.some((o) => o.id === mapped.id);
+        return {
+          ...prev,
+          orders: exists
+            ? prev.orders.map((o) => (o.id === mapped.id ? mapped : o))
+            : [mapped, ...prev.orders],
+        };
+      });
+      return mapped;
+    }
+  } catch {
+    // Fall back to local cache
+  }
+
+  return localMatch ?? null;
+}
+
+export async function seedCatalogToSupabase(): Promise<{ ok: boolean; message: string }> {
+  if (!supabase) {
+    return { ok: false, message: "Supabase environment variables are not configured yet." };
+  }
+  try {
+    const rows = currentState.products.map(mapProductToRow);
+    const { error } = await supabase
+      .from("products")
+      .upsert(rows, { onConflict: "slug" });
+    if (error) {
+      return { ok: false, message: error.message };
+    }
+    await supabase.from("store_settings").upsert(
+      {
+        id: 1,
+        store_name: currentState.settings.storeName,
+        support_email: currentState.settings.supportEmail,
+        currency: currentState.settings.currency,
+        free_shipping_threshold: currentState.settings.freeShippingThreshold,
+        standard_shipping_rate: currentState.settings.standardShippingRate,
+        express_shipping_rate: currentState.settings.expressShippingRate,
+        tax_rate_percent: currentState.settings.taxRatePercent,
+        announcement_text: currentState.settings.announcementText,
+        announcement_enabled: currentState.settings.announcementEnabled,
+        stripe_checkout_mode: currentState.settings.stripeCheckoutMode,
+        global_stripe_payment_link: currentState.settings.globalStripePaymentLink,
+        stripe_publishable_key: currentState.settings.stripePublishableKey,
+      },
+      { onConflict: "id" },
+    );
+    await syncFromSupabase();
+    return { ok: true, message: "Catalog & settings synced to Supabase!" };
+  } catch (err) {
+    return {
+      ok: false,
+      message: err instanceof Error ? err.message : "Failed to sync to Supabase.",
+    };
+  }
+}
+
 export function hydrateEcommerceStore() {
   if (typeof window === "undefined" || hasHydratedClient) return;
   hasHydratedClient = true;
@@ -886,9 +1000,10 @@ export function hydrateEcommerceStore() {
   if (saved) {
     currentState = {
       ...DEFAULT_STATE,
-      products: Array.isArray(saved.products) && saved.products.length > 0
-        ? saved.products
-        : INITIAL_PRODUCTS,
+      products:
+        Array.isArray(saved.products) && saved.products.length > 0
+          ? saved.products
+          : INITIAL_PRODUCTS,
       cart: Array.isArray(saved.cart) ? saved.cart : [],
       orders: Array.isArray(saved.orders) ? saved.orders : INITIAL_ORDERS,
       promoCodes: Array.isArray(saved.promoCodes) ? saved.promoCodes : INITIAL_PROMO_CODES,
@@ -901,10 +1016,10 @@ export function hydrateEcommerceStore() {
         : INITIAL_SETTINGS,
       cartDrawerOpen: false,
       toastMessage: "",
+      supabaseSynced: false,
     };
     emitChange();
   } else {
-    // Migrate legacy cart if user had items from earlier storefront version
     try {
       const legacyRaw = window.localStorage.getItem(LEGACY_CART_KEY);
       if (legacyRaw) {
@@ -954,6 +1069,28 @@ export function hydrateEcommerceStore() {
       }
     }
   });
+
+  if (isSupabaseConfigured && supabase) {
+    void syncFromSupabase();
+
+    supabase
+      .channel("mlc-live-commerce")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "products" },
+        () => {
+          void syncFromSupabase();
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "orders" },
+        () => {
+          void refreshAdminCloudData();
+        },
+      )
+      .subscribe();
+  }
 }
 
 function updateState(updater: (prev: EcommerceState) => EcommerceState, persist = true) {
@@ -1161,9 +1298,10 @@ export interface CreateOrderInput {
   paymentMethod: PaymentMethodType;
   paymentStatus: PaymentStatus;
   stripePaymentLinkUrl: string;
+  clearShoppingBag?: boolean;
 }
 
-export function createStoreOrder(input: CreateOrderInput): Order | null {
+export async function createStoreOrder(input: CreateOrderInput): Promise<Order | null> {
   const { lines, subtotal } = getHydratedCart(currentState);
   if (lines.length === 0) return null;
 
@@ -1188,17 +1326,25 @@ export function createStoreOrder(input: CreateOrderInput): Order | null {
     Math.round(discountedSubtotal * (settings.taxRatePercent / 100) * 100) / 100;
   const total = Math.round((discountedSubtotal + shippingCost + taxAmount) * 100) / 100;
 
-  const numericIds = currentState.orders
-    .map((o) => Number.parseInt(o.id.replace(/\D/g, ""), 10))
-    .filter((n) => !Number.isNaN(n));
-  const maxNum = numericIds.length > 0 ? Math.max(...numericIds) : 1045;
-  const orderId = `MLC-${maxNum + 1}`;
+  // Collision-safe order ID across concurrent cloud guests
+  const stamp = Date.now().toString().slice(-5);
+  const rand = Math.floor(10 + Math.random() * 90);
+  const orderId = isSupabaseConfigured
+    ? `MLC-${stamp}${rand}`
+    : (() => {
+        const numericIds = currentState.orders
+          .map((o) => Number.parseInt(o.id.replace(/\D/g, ""), 10))
+          .filter((n) => !Number.isNaN(n));
+        const maxNum = numericIds.length > 0 ? Math.max(...numericIds) : 1045;
+        return `MLC-${maxNum + 1}`;
+      })();
+
   const now = new Date().toISOString();
   const randomHex = Math.random().toString(16).slice(2, 14);
   const stripeSessionId =
     input.paymentMethod === "stripe_payment_link"
       ? `plink_${randomHex}`
-      : `cs_test_${randomHex}`;
+      : `cs_pending_${randomHex}`;
 
   const orderItems: OrderLineItem[] = lines.map((line) => ({
     productId: line.product.id,
@@ -1241,20 +1387,22 @@ export function createStoreOrder(input: CreateOrderInput): Order | null {
         label:
           input.paymentStatus === "paid"
             ? "Order Placed & Paid via Stripe"
-            : "Order Created — Redirected to Stripe Payment Link",
+            : "Order Created — Redirected to Stripe Checkout",
         note:
           input.paymentStatus === "paid"
             ? `Payment authorized (${formatMoney(total)}). Queued for studio fulfillment.`
-            : `Order total ${formatMoney(total)}. Awaiting Stripe Payment Link webhook confirmation.`,
+            : `Order total ${formatMoney(total)}. Awaiting Stripe payment completion.`,
         timestamp: now,
       },
     ],
   };
 
+  const shouldClear = input.clearShoppingBag !== false;
+
   updateState((prev) => ({
     ...prev,
     orders: [newOrder, ...prev.orders],
-    cart: [],
+    cart: shouldClear ? [] : prev.cart,
     cartDrawerOpen: false,
     products: prev.products.map((prod) => {
       const ordered = orderItems.find((item) => item.productId === prod.id);
@@ -1271,7 +1419,30 @@ export function createStoreOrder(input: CreateOrderInput): Order | null {
         : prev.promoCodes,
   }));
 
+  if (supabase) {
+    try {
+      await supabase.from("orders").insert(mapOrderToRow(newOrder));
+      for (const item of orderItems) {
+        await supabase.rpc("decrement_product_stock", {
+          p_product_id: item.productId,
+          p_qty: item.quantity,
+        });
+      }
+    } catch {
+      // Local state still preserved safely
+    }
+  }
+
   return newOrder;
+}
+
+export function attachStripeSessionToOrder(orderId: string, sessionId: string) {
+  updateState((prev) => ({
+    ...prev,
+    orders: prev.orders.map((o) =>
+      o.id === orderId ? { ...o, stripeSessionId: sessionId } : o,
+    ),
+  }));
 }
 
 // --- Admin Order Management Actions ---
@@ -1293,6 +1464,8 @@ export function updateOrderStatus(
   trackingNumber?: string,
 ) {
   const now = new Date().toISOString();
+  let updatedOrderRef: Order | null = null;
+
   updateState((prev) => ({
     ...prev,
     orders: prev.orders.map((order) => {
@@ -1318,7 +1491,7 @@ export function updateOrderStatus(
         timestamp: now,
       };
 
-      return {
+      const nextOrder: Order = {
         ...order,
         orderStatus: nextStatus,
         updatedAt: now,
@@ -1326,11 +1499,31 @@ export function updateOrderStatus(
         trackingNumber: tracking,
         timeline: [...order.timeline, event],
       };
+      updatedOrderRef = nextOrder;
+      return nextOrder;
     }),
   }));
+
+  if (supabase && updatedOrderRef) {
+    const snapshot = updatedOrderRef as Order;
+    void supabase
+      .from("orders")
+      .update({
+        order_status: snapshot.orderStatus,
+        tracking_carrier: snapshot.trackingCarrier,
+        tracking_number: snapshot.trackingNumber,
+        timeline: snapshot.timeline,
+        updated_at: now,
+      })
+      .eq("id", orderId);
+  }
 }
 
-export function updateOrderPaymentStatus(orderId: string, paymentStatus: PaymentStatus) {
+export function updateOrderPaymentStatus(
+  orderId: string,
+  paymentStatus: PaymentStatus,
+  sessionIdOverride?: string,
+) {
   const now = new Date().toISOString();
   updateState((prev) => ({
     ...prev,
@@ -1339,10 +1532,22 @@ export function updateOrderPaymentStatus(orderId: string, paymentStatus: Payment
       return {
         ...order,
         paymentStatus,
+        stripeSessionId: sessionIdOverride ?? order.stripeSessionId,
         updatedAt: now,
       };
     }),
   }));
+
+  if (supabase) {
+    const patch: Record<string, unknown> = {
+      payment_status: paymentStatus,
+      updated_at: now,
+    };
+    if (sessionIdOverride) {
+      patch["stripe_session_id"] = sessionIdOverride;
+    }
+    void supabase.from("orders").update(patch).eq("id", orderId);
+  }
 }
 
 export function updateOrderTracking(
@@ -1366,6 +1571,18 @@ export function updateOrderTracking(
         : order,
     ),
   }));
+
+  if (supabase) {
+    void supabase
+      .from("orders")
+      .update({
+        tracking_carrier: trackingCarrier.trim(),
+        tracking_number: trackingNumber.trim(),
+        internal_notes: internalNotes,
+        updated_at: now,
+      })
+      .eq("id", orderId);
+  }
 }
 
 // --- Admin Product & Inventory Management Actions ---
@@ -1391,7 +1608,6 @@ export function saveProduct(productInput: Omit<Product, "id"> & { id?: number })
       nextProducts = [...prev.products, created];
     }
 
-    // If savedProduct is marked featured, ensure only one primary featured spotlight if set
     if (savedProduct && savedProduct.featured) {
       const targetId = savedProduct.id;
       nextProducts = nextProducts.map((p) => ({
@@ -1403,25 +1619,53 @@ export function saveProduct(productInput: Omit<Product, "id"> & { id?: number })
     return { ...prev, products: nextProducts };
   });
 
-  return savedProduct ?? ({ ...productInput, id: 1 } as Product);
+  const finalProduct = savedProduct ?? ({ ...productInput, id: 1 } as Product);
+
+  if (supabase) {
+    void supabase
+      .from("products")
+      .upsert(mapProductToRow(finalProduct), { onConflict: "slug" });
+  }
+
+  return finalProduct;
 }
 
 export function adjustProductStock(productId: number, delta: number) {
+  let nextStockVal: number | null = null;
   updateState((prev) => ({
     ...prev,
-    products: prev.products.map((p) =>
-      p.id === productId ? { ...p, stock: Math.max(0, p.stock + delta) } : p,
-    ),
+    products: prev.products.map((p) => {
+      if (p.id !== productId) return p;
+      nextStockVal = Math.max(0, p.stock + delta);
+      return { ...p, stock: nextStockVal };
+    }),
   }));
+
+  if (supabase && nextStockVal !== null) {
+    void supabase
+      .from("products")
+      .update({ stock: nextStockVal, updated_at: new Date().toISOString() })
+      .eq("id", productId);
+  }
 }
 
 export function toggleProductActive(productId: number) {
+  let nextActive: boolean | null = null;
   updateState((prev) => ({
     ...prev,
-    products: prev.products.map((p) =>
-      p.id === productId ? { ...p, active: !p.active } : p,
-    ),
+    products: prev.products.map((p) => {
+      if (p.id !== productId) return p;
+      nextActive = !p.active;
+      return { ...p, active: nextActive };
+    }),
   }));
+
+  if (supabase && nextActive !== null) {
+    void supabase
+      .from("products")
+      .update({ active: nextActive, updated_at: new Date().toISOString() })
+      .eq("id", productId);
+  }
 }
 
 export function deleteProduct(productId: number) {
@@ -1430,6 +1674,10 @@ export function deleteProduct(productId: number) {
     products: prev.products.filter((p) => p.id !== productId),
     cart: prev.cart.filter((c) => c.productId !== productId),
   }));
+
+  if (supabase) {
+    void supabase.from("products").delete().eq("id", productId);
+  }
 }
 
 // --- Customer Inquiries, Subscribers, Promo Codes & Store Settings ---
@@ -1441,7 +1689,7 @@ export function submitCustomerInquiry(input: {
   message: string;
 }) {
   const newInquiry: CustomerInquiry = {
-    id: `INQ-${Date.now().toString().slice(-4)}`,
+    id: `INQ-${Date.now().toString().slice(-5)}`,
     createdAt: new Date().toISOString(),
     name: input.name.trim(),
     email: input.email.trim(),
@@ -1453,6 +1701,18 @@ export function submitCustomerInquiry(input: {
     ...prev,
     inquiries: [newInquiry, ...prev.inquiries],
   }));
+
+  if (supabase) {
+    void supabase.from("customer_inquiries").insert({
+      id: newInquiry.id,
+      name: newInquiry.name,
+      email: newInquiry.email,
+      inquiry_type: newInquiry.inquiryType,
+      message: newInquiry.message,
+      status: "new",
+      created_at: newInquiry.createdAt,
+    });
+  }
 }
 
 export function updateInquiryStatus(id: string, status: CustomerInquiry["status"]) {
@@ -1460,20 +1720,31 @@ export function updateInquiryStatus(id: string, status: CustomerInquiry["status"
     ...prev,
     inquiries: prev.inquiries.map((inq) => (inq.id === id ? { ...inq, status } : inq)),
   }));
+
+  if (supabase) {
+    void supabase.from("customer_inquiries").update({ status }).eq("id", id);
+  }
 }
 
 export function addNewsletterSubscriber(email: string) {
   const clean = email.trim().toLowerCase();
   if (!clean) return;
+  const now = new Date().toISOString();
   updateState((prev) => {
     if (prev.subscribers.some((s) => s.email.toLowerCase() === clean)) {
       return prev;
     }
     return {
       ...prev,
-      subscribers: [{ email: clean, joinedAt: new Date().toISOString() }, ...prev.subscribers],
+      subscribers: [{ email: clean, joinedAt: now }, ...prev.subscribers],
     };
   });
+
+  if (supabase) {
+    void supabase
+      .from("newsletter_subscribers")
+      .upsert({ email: clean, joined_at: now }, { onConflict: "email" });
+  }
 }
 
 export function upsertPromoCode(promo: PromoCode) {
@@ -1490,15 +1761,37 @@ export function upsertPromoCode(promo: PromoCode) {
         : [cleanPromo, ...prev.promoCodes],
     };
   });
+
+  if (supabase) {
+    void supabase.from("promo_codes").upsert(
+      {
+        code: cleanPromo.code,
+        type: cleanPromo.type,
+        value: cleanPromo.value,
+        min_subtotal: cleanPromo.minSubtotal,
+        active: cleanPromo.active,
+        usage_count: cleanPromo.usageCount,
+        description: cleanPromo.description,
+      },
+      { onConflict: "code" },
+    );
+  }
 }
 
 export function togglePromoCode(code: string) {
+  let nextActive: boolean | null = null;
   updateState((prev) => ({
     ...prev,
-    promoCodes: prev.promoCodes.map((p) =>
-      p.code === code ? { ...p, active: !p.active } : p,
-    ),
+    promoCodes: prev.promoCodes.map((p) => {
+      if (p.code !== code) return p;
+      nextActive = !p.active;
+      return { ...p, active: nextActive };
+    }),
   }));
+
+  if (supabase && nextActive !== null) {
+    void supabase.from("promo_codes").update({ active: nextActive }).eq("code", code);
+  }
 }
 
 export function deletePromoCode(code: string) {
@@ -1506,13 +1799,41 @@ export function deletePromoCode(code: string) {
     ...prev,
     promoCodes: prev.promoCodes.filter((p) => p.code !== code),
   }));
+
+  if (supabase) {
+    void supabase.from("promo_codes").delete().eq("code", code);
+  }
 }
 
 export function updateStoreSettings(patch: Partial<StoreSettings>) {
-  updateState((prev) => ({
-    ...prev,
-    settings: { ...prev.settings, ...patch },
-  }));
+  let merged: StoreSettings | null = null;
+  updateState((prev) => {
+    merged = { ...prev.settings, ...patch };
+    return { ...prev, settings: merged };
+  });
+
+  if (supabase && merged) {
+    const s = merged as StoreSettings;
+    void supabase.from("store_settings").upsert(
+      {
+        id: 1,
+        store_name: s.storeName,
+        support_email: s.supportEmail,
+        currency: s.currency,
+        free_shipping_threshold: s.freeShippingThreshold,
+        standard_shipping_rate: s.standardShippingRate,
+        express_shipping_rate: s.expressShippingRate,
+        tax_rate_percent: s.taxRatePercent,
+        announcement_text: s.announcementText,
+        announcement_enabled: s.announcementEnabled,
+        stripe_checkout_mode: s.stripeCheckoutMode,
+        global_stripe_payment_link: s.globalStripePaymentLink,
+        stripe_publishable_key: s.stripePublishableKey,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "id" },
+    );
+  }
 }
 
 export function resetStoreToDefaults() {

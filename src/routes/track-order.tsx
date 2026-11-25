@@ -10,6 +10,7 @@ import {
 import { FormEvent, useState } from "react";
 import {
   formatMoney,
+  lookupCloudOrder,
   ORDER_STATUS_LABELS,
   OrderStatus,
   useEcommerceStore,
@@ -30,6 +31,7 @@ function TrackOrderPage() {
   const [queryId, setQueryId] = useState(state.orders[0]?.id ?? "MLC-1045");
   const [queryEmail, setQueryEmail] = useState("");
   const [activeOrderId, setActiveOrderId] = useState(state.orders[0]?.id ?? "MLC-1045");
+  const [searching, setSearching] = useState(false);
 
   const matchedOrder = state.orders.find((o) => {
     const idMatch = o.id.toUpperCase() === activeOrderId.trim().toUpperCase();
@@ -38,9 +40,13 @@ function TrackOrderPage() {
     return o.customer.email.toLowerCase() === queryEmail.trim().toLowerCase();
   });
 
-  const handleLookup = (e: FormEvent) => {
+  const handleLookup = async (e: FormEvent) => {
     e.preventDefault();
-    setActiveOrderId(queryId.trim());
+    const trimmed = queryId.trim();
+    setActiveOrderId(trimmed);
+    setSearching(true);
+    await lookupCloudOrder(trimmed, queryEmail);
+    setSearching(false);
   };
 
   const currentIdx = matchedOrder
@@ -64,7 +70,9 @@ function TrackOrderPage() {
         </div>
 
         <form
-          onSubmit={handleLookup}
+          onSubmit={(e) => {
+            void handleLookup(e);
+          }}
           className="mt-10 grid gap-3 border border-border bg-card p-5 sm:grid-cols-[1fr_1fr_auto] md:p-7"
         >
           <input
@@ -86,13 +94,13 @@ function TrackOrderPage() {
           />
           <button
             type="submit"
-            className="inline-flex items-center justify-center gap-2 bg-midnight px-6 py-3 text-[10px] font-semibold uppercase tracking-[.16em] text-primary-foreground transition hover:bg-earth"
+            disabled={searching}
+            className="inline-flex items-center justify-center gap-2 bg-midnight px-6 py-3 text-[10px] font-semibold uppercase tracking-[.16em] text-primary-foreground transition hover:bg-earth disabled:opacity-60"
           >
-            <Search size={14} /> Track
+            <Search size={14} /> {searching ? "Searching..." : "Track"}
           </button>
         </form>
 
-        {/* Quick Select Recent Orders */}
         {state.orders.length > 0 && (
           <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
             <span className="text-muted-foreground">Recent orders:</span>
@@ -127,7 +135,6 @@ function TrackOrderPage() {
           </div>
         ) : (
           <div className="mt-10 space-y-8">
-            {/* Status Header Card */}
             <div className="border border-border bg-card p-6 md:p-8">
               <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border pb-6">
                 <div>
@@ -138,7 +145,8 @@ function TrackOrderPage() {
                     {ORDER_STATUS_LABELS[matchedOrder.orderStatus]}
                   </h2>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Placed on {new Date(matchedOrder.createdAt).toLocaleDateString("en-US", {
+                    Placed on{" "}
+                    {new Date(matchedOrder.createdAt).toLocaleDateString("en-US", {
                       month: "long",
                       day: "numeric",
                       year: "numeric",
@@ -196,7 +204,6 @@ function TrackOrderPage() {
               )}
             </div>
 
-            {/* Activity Log & Order Summary */}
             <div className="grid gap-8 md:grid-cols-[1.1fr_.9fr]">
               <div className="border border-border bg-card p-6 md:p-8">
                 <h3 className="flex items-center gap-2 font-display text-2xl text-midnight">

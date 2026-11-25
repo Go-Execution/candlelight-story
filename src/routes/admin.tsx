@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   CreditCard,
+  Database,
   ExternalLink,
   LayoutDashboard,
   Lock,
@@ -12,7 +13,13 @@ import {
   X,
 } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
-import { useEcommerceStore } from "@/lib/ecommerce-store";
+import { refreshAdminCloudData, useEcommerceStore } from "@/lib/ecommerce-store";
+import {
+  fetchIntegrationHealth,
+  IntegrationHealthStatus,
+  isSupabaseConfigured,
+  supabase,
+} from "@/lib/supabase";
 import { AdminOrdersTab } from "@/components/admin/AdminOrdersTab";
 import { AdminProductsTab } from "@/components/admin/AdminProductsTab";
 import {
@@ -36,21 +43,47 @@ const DEMO_PASSCODE = "madeleine2026";
 function AdminPortalPage() {
   const state = useEcommerceStore();
   const [unlocked, setUnlocked] = useState(false);
+  const [adminEmail, setAdminEmail] = useState("");
   const [passcode, setPasscode] = useState("");
+  const [signingIn, setSigningIn] = useState(false);
   const [authError, setAuthError] = useState("");
   const [activeTab, setActiveTab] = useState<AdminTab>("orders");
   const [focusedOrderId, setFocusedOrderId] = useState<string | null>(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [health, setHealth] = useState<IntegrationHealthStatus | null>(null);
 
   useEffect(() => {
+    void fetchIntegrationHealth().then(setHealth);
+
     if (typeof window !== "undefined") {
       if (window.sessionStorage.getItem(ADMIN_SESSION_KEY) === "true") {
         setUnlocked(true);
       }
     }
+
+    if (supabase) {
+      void supabase.auth.getSession().then(({ data }) => {
+        if (data.session) {
+          setUnlocked(true);
+          void refreshAdminCloudData();
+        }
+      });
+
+      const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+        if (session) {
+          setUnlocked(true);
+          void refreshAdminCloudData();
+        }
+      });
+
+      return () => {
+        listener.subscription.unsubscribe();
+      };
+    }
+    return undefined;
   }, []);
 
-  const grantAccess = () => {
+  const grantLocalPreviewAccess = () => {
     if (typeof window !== "undefined") {
       window.sessionStorage.setItem(ADMIN_SESSION_KEY, "true");
     }
@@ -58,18 +91,45 @@ function AdminPortalPage() {
     setAuthError("");
   };
 
-  const handleLogin = (e: FormEvent) => {
+  const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
+    setAuthError("");
+
+    // If Supabase Auth is configured and user entered an email, authenticate via Supabase Auth
+    if (supabase && adminEmail.trim().includes("@")) {
+      setSigningIn(true);
+      const { error } = await supabase.auth.signInWithPassword({
+        email: adminEmail.trim(),
+        password: passcode,
+      });
+      setSigningIn(false);
+      if (error) {
+        setAuthError(error.message);
+        return;
+      }
+      grantLocalPreviewAccess();
+      await refreshAdminCloudData();
+      return;
+    }
+
+    // Fallback studio passcode check
     if (passcode.trim() === DEMO_PASSCODE || passcode.trim().toLowerCase() === "admin") {
-      grantAccess();
+      grantLocalPreviewAccess();
     } else {
-      setAuthError("Invalid studio passcode. Use 'madeleine2026' or Quick Demo Sign-In below.");
+      setAuthError(
+        isSupabaseConfigured
+          ? "Enter your Supabase Admin email & password, or use passcode 'madeleine2026'."
+          : "Invalid studio passcode. Use 'madeleine2026' or Quick Enter below.",
+      );
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (typeof window !== "undefined") {
       window.sessionStorage.removeItem(ADMIN_SESSION_KEY);
+    }
+    if (supabase) {
+      await supabase.auth.signOut();
     }
     setUnlocked(false);
     setPasscode("");
@@ -99,20 +159,42 @@ function AdminPortalPage() {
             </p>
             <h1 className="mt-1 font-display text-4xl text-midnight">Admin Portal</h1>
             <p className="mt-2 text-xs text-muted-foreground">
-              Manage orders, shipping fulfillment, candle inventory, and Stripe checkout links.
+              {isSupabaseConfigured
+                ? "Sign in with your Supabase Admin account to manage cloud orders & Stripe."
+                : "Manage orders, fulfillment, candle inventory, and Supabase/Stripe setup."}
             </p>
           </div>
 
-          <form onSubmit={handleLogin} className="mt-7 space-y-4">
+          <form
+            onSubmit={(e) => {
+              void handleLogin(e);
+            }}
+            className="mt-7 space-y-4"
+          >
+            {isSupabaseConfigured && (
+              <label className="block">
+                <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[.15em] text-charcoal">
+                  Admin Email (Supabase Auth)
+                </span>
+                <input
+                  type="email"
+                  value={adminEmail}
+                  onChange={(e) => setAdminEmail(e.target.value)}
+                  placeholder="info@madeleineluciacandle.com"
+                  className="w-full border border-border bg-card px-4 py-3 text-sm outline-none focus:border-midnight"
+                />
+              </label>
+            )}
+
             <label className="block">
               <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[.15em] text-charcoal">
-                Studio Passcode
+                {isSupabaseConfigured ? "Password / Studio Passcode" : "Studio Passcode"}
               </span>
               <input
                 type="password"
                 value={passcode}
                 onChange={(e) => setPasscode(e.target.value)}
-                placeholder="Enter studio passcode"
+                placeholder="Enter password"
                 className="w-full border border-border bg-card px-4 py-3 text-sm outline-none focus:border-midnight"
               />
             </label>
@@ -121,19 +203,20 @@ function AdminPortalPage() {
 
             <button
               type="submit"
-              className="flex w-full items-center justify-center gap-2 bg-midnight py-3.5 text-[10px] font-semibold uppercase tracking-[.18em] text-primary-foreground transition hover:bg-earth"
+              disabled={signingIn}
+              className="flex w-full items-center justify-center gap-2 bg-midnight py-3.5 text-[10px] font-semibold uppercase tracking-[.18em] text-primary-foreground transition hover:bg-earth disabled:opacity-60"
             >
-              <Lock size={13} /> Sign In to Dashboard
+              <Lock size={13} /> {signingIn ? "Signing In..." : "Sign In to Dashboard"}
             </button>
           </form>
 
           <div className="mt-5 border-t border-border pt-5 text-center">
             <button
               type="button"
-              onClick={grantAccess}
+              onClick={grantLocalPreviewAccess}
               className="w-full border border-midnight bg-powder/45 py-3 text-[10px] font-semibold uppercase tracking-[.16em] text-midnight transition hover:bg-midnight hover:text-primary-foreground"
             >
-              Quick Enter Studio Admin (Phase 1 Preview)
+              Quick Enter Studio Admin
             </button>
             <Link
               to="/"
@@ -157,7 +240,7 @@ function AdminPortalPage() {
     { id: "orders", label: "Orders", icon: ShoppingBag, badge: openOrderCount },
     { id: "products", label: "Products & Stock", icon: Package },
     { id: "customers", label: "Customers & Inbox", icon: Users, badge: newInquiryCount },
-    { id: "stripe", label: "Stripe & Settings", icon: CreditCard },
+    { id: "stripe", label: "Supabase & Stripe", icon: CreditCard },
   ];
 
   const selectTab = (tab: AdminTab) => {
@@ -167,7 +250,6 @@ function AdminPortalPage() {
 
   return (
     <div className="flex min-h-screen bg-ivory text-charcoal">
-      {/* Desktop Sidebar */}
       <aside className="hidden w-64 shrink-0 flex-col bg-midnight text-primary-foreground lg:flex">
         <div className="border-b border-primary-foreground/15 px-6 py-6">
           <p className="text-[9px] font-semibold uppercase tracking-[.26em] text-dusty">
@@ -187,7 +269,7 @@ function AdminPortalPage() {
                 onClick={() => selectTab(item.id)}
                 className={`flex w-full items-center justify-between px-4 py-3 text-left text-xs font-medium transition ${
                   active
-                    ? "bg-ivory text-midnight font-semibold"
+                    ? "bg-ivory font-semibold text-midnight"
                     : "text-primary-foreground/80 hover:bg-primary-foreground/10 hover:text-primary-foreground"
                 }`}
               >
@@ -219,7 +301,9 @@ function AdminPortalPage() {
           </Link>
           <button
             type="button"
-            onClick={handleLogout}
+            onClick={() => {
+              void handleLogout();
+            }}
             className="flex w-full items-center gap-2 px-4 py-2 text-xs text-primary-foreground/65 hover:text-primary-foreground"
           >
             <LogOut size={14} /> Lock Admin
@@ -227,7 +311,6 @@ function AdminPortalPage() {
         </div>
       </aside>
 
-      {/* Mobile Drawer Navigation */}
       {mobileNavOpen && (
         <div className="fixed inset-0 z-[75] flex lg:hidden">
           <div
@@ -273,9 +356,8 @@ function AdminPortalPage() {
         </div>
       )}
 
-      {/* Main Content Area */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center justify-between border-b border-border bg-[#FDF1EB] px-5 py-3.5 md:px-8">
+        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-[#FDF1EB] px-5 py-3.5 md:px-8">
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -289,9 +371,30 @@ function AdminPortalPage() {
               <p className="text-xs font-semibold text-midnight">
                 Madeleine Lucia Candle Co. — Commerce Console
               </p>
-              <p className="text-[11px] text-muted-foreground">
-                Phase 1 Frontend Active • Storefront & Admin Live Synced
-              </p>
+              <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[10px]">
+                <span
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 font-semibold uppercase tracking-wider ${
+                    isSupabaseConfigured
+                      ? "bg-emerald-100 text-emerald-900"
+                      : "bg-amber-100 text-amber-900"
+                  }`}
+                >
+                  <Database size={10} />
+                  {isSupabaseConfigured ? "Supabase Connected" : "Supabase Keys Pending"}
+                </span>
+                <span
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 font-semibold uppercase tracking-wider ${
+                    health?.stripe.secretKeyConfigured
+                      ? "bg-emerald-100 text-emerald-900"
+                      : "bg-amber-100 text-amber-900"
+                  }`}
+                >
+                  <CreditCard size={10} />
+                  {health?.stripe.secretKeyConfigured
+                    ? `Stripe ${health.stripe.mode.toUpperCase()} Ready`
+                    : "Stripe Secret Pending"}
+                </span>
+              </div>
             </div>
           </div>
 

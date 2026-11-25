@@ -8,12 +8,16 @@ import {
   ShieldCheck,
   Truck,
 } from "lucide-react";
+import { useEffect, useState } from "react";
 import {
   formatMoney,
+  lookupCloudOrder,
   ORDER_STATUS_LABELS,
   OrderStatus,
+  updateOrderPaymentStatus,
   useEcommerceStore,
 } from "@/lib/ecommerce-store";
+import { verifyReturnedStripeSession } from "@/lib/supabase";
 import { Eyebrow, StoreFooter, StoreHeader } from "@/components/shop/StorefrontChrome";
 
 export const Route = createFileRoute("/order-confirmation/$orderId")({
@@ -34,10 +38,48 @@ const PIPELINE_STEPS: OrderStatus[] = [
 function OrderConfirmationPage() {
   const { orderId } = Route.useParams();
   const state = useEcommerceStore();
+  const [loadingCloud, setLoadingCloud] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    const syncConfirmation = async () => {
+      await lookupCloudOrder(orderId);
+      if (typeof window !== "undefined") {
+        const params = new URLSearchParams(window.location.search);
+        const sessionId = params.get("session_id") ?? "";
+        if (sessionId) {
+          const check = await verifyReturnedStripeSession(sessionId, orderId);
+          if (active && check.paid) {
+            updateOrderPaymentStatus(orderId, "paid", sessionId);
+          }
+        }
+      }
+      if (active) setLoadingCloud(false);
+    };
+    void syncConfirmation();
+    return () => {
+      active = false;
+    };
+  }, [orderId]);
 
   const order = state.orders.find(
     (o) => o.id.toUpperCase() === orderId.toUpperCase(),
   );
+
+  if (!order && loadingCloud) {
+    return (
+      <main className="min-h-screen bg-ivory">
+        <StoreHeader />
+        <div className="mx-auto flex min-h-[75vh] max-w-xl flex-col items-center justify-center px-5 pt-40 text-center">
+          <div className="size-9 animate-spin rounded-full border-2 border-midnight border-t-transparent" />
+          <p className="mt-4 text-sm text-muted-foreground">
+            Retrieving your order and verifying Stripe confirmation...
+          </p>
+        </div>
+        <StoreFooter />
+      </main>
+    );
+  }
 
   if (!order) {
     return (
@@ -47,8 +89,8 @@ function OrderConfirmationPage() {
           <Eyebrow>Order Lookup</Eyebrow>
           <h1 className="mt-3 font-display text-5xl text-midnight">Order Not Found</h1>
           <p className="mt-3 text-sm text-muted-foreground">
-            We couldn't locate order <strong>{orderId}</strong> in this browser session. You can
-            search any order on our tracking page.
+            We couldn't locate order <strong>{orderId}</strong>. You can search any order on our
+            tracking page.
           </p>
           <Link
             to="/track-order"
@@ -87,11 +129,11 @@ function OrderConfirmationPage() {
               Order #{order.id}
             </span>
             <span className="text-border">•</span>
-            <span className="flex items-center gap-1 text-earth font-medium">
+            <span className="flex items-center gap-1 font-medium text-earth">
               <ShieldCheck size={14} />
               {order.paymentStatus === "paid"
                 ? "Paid via Stripe"
-                : "Awaiting Stripe Link Confirmation"}
+                : "Awaiting Stripe Confirmation"}
             </span>
             <span className="text-border">•</span>
             <span className="text-muted-foreground">
@@ -115,7 +157,6 @@ function OrderConfirmationPage() {
             </div>
           )}
 
-          {/* Live Fulfillment Progress */}
           {order.orderStatus !== "cancelled" && (
             <div className="mt-10 border-t border-border pt-8 text-left">
               <p className="text-center text-[10px] font-semibold uppercase tracking-[.2em] text-earth">
