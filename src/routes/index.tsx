@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { AnimatePresence, motion, useReducedMotion, useScroll, useTransform } from "motion/react";
 import {
   ArrowDown,
@@ -7,20 +7,31 @@ import {
   ChevronDown,
   Flame,
   Heart,
-  Instagram,
-  Menu,
-  Minus,
-  Plus,
   Search,
   ShoppingBag,
+  SlidersHorizontal,
   Sparkles,
-  Trash2,
   X,
 } from "lucide-react";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import heroImage from "@/assets/candle-hero.jpg";
 import storyImage from "@/assets/candle-story.jpg";
 import heritageImage from "@/assets/candle-heritage.jpg";
+import {
+  addNewsletterSubscriber,
+  addToCart,
+  formatMoney,
+  Product,
+  ProductCategory,
+  submitCustomerInquiry,
+  useEcommerceStore,
+} from "@/lib/ecommerce-store";
+import {
+  Eyebrow,
+  QuickViewModal,
+  StoreFooter,
+  StoreHeader,
+} from "@/components/shop/StorefrontChrome";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -40,253 +51,85 @@ export const Route = createFileRoute("/")({
   component: CandleStore,
 });
 
-type Product = {
-  id: number;
-  name: string;
-  fragrance: string;
-  mood: string;
-  size: string;
-  price: number;
-  image: string;
-  position: string;
-};
-type CartLine = Product & { quantity: number };
-
-const products: Product[] = [
-  {
-    id: 1,
-    name: "Summer Sunset",
-    fragrance: "Peach Mango & Tropical Citrus",
-    mood: "Fruity smooth with Caribbean calmness, perfect all day.",
-    size: "8 oz",
-    price: 15,
-    image: "/products/summer-sunset.jpg",
-    position: "object-center",
-  },
-  {
-    id: 2,
-    name: "Ambrevelle",
-    fragrance: "Golden Amber & Warm Vanilla",
-    mood: "Warmth in every glow, an inviting evening linger.",
-    size: "8 oz",
-    price: 15,
-    image: "/products/ambrevelle.jpg",
-    position: "object-center",
-  },
-  {
-    id: 3,
-    name: "Autumn Apple",
-    fragrance: "Macintosh Apple & Warm Orchard Spices",
-    mood: "Warm apples and crisp orchard breezes, definitely a Fall season.",
-    size: "8 oz",
-    price: 15,
-    image: "/products/autumn-apple.jpg",
-    position: "object-center",
-  },
-  {
-    id: 4,
-    name: "Caribbean Ocean",
-    fragrance: "Caribbean Teakwood & Fresh Sea Salt",
-    mood: "Fresh subtle morning smell, cool ocean breezes for Spring & Summer.",
-    size: "8 oz",
-    price: 15,
-    image: "/products/caribbean-ocean.jpg",
-    position: "object-center",
-  },
-  {
-    id: 5,
-    name: "Driftwood Haven",
-    fragrance: "Mahogany Teakwood & Earthy Cedar",
-    mood: "The serene beauty of stillness and grounded comfort.",
-    size: "8 oz",
-    price: 15,
-    image: "/products/driftwood-haven.jpg",
-    position: "object-center",
-  },
-  {
-    id: 6,
-    name: "Veloura Pumpkin",
-    fragrance: "Pumpkin Spice & Velvety Buttercream",
-    mood: "Cozy autumn indulgence, velvety warmth, and festive comfort.",
-    size: "8 oz",
-    price: 15,
-    image: "/products/veloura-pumpkin.jpg",
-    position: "object-center",
-  },
-  {
-    id: 7,
-    name: "Boozy Bourbon",
-    fragrance: "Butterscotch Bourbon & Sweet Honey",
-    mood: "Warm and cozy with rich caramel notes, perfect for Fall and Winter.",
-    size: "8 oz",
-    price: 15,
-    image: "/products/boozy-bourbon.jpg",
-    position: "object-center",
-  },
-];
-
 const fade = {
   initial: { opacity: 0, y: 28 },
   whileInView: { opacity: 1, y: 0 },
   viewport: { once: true, margin: "-80px" },
   transition: { duration: 0.75, ease: [0.22, 1, 0.36, 1] as const },
 };
+
 const scrollTo = (id: string) =>
   document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
-const money = (n: number) => `$${n.toFixed(2)}`;
+
+const CATEGORIES: Array<"All" | ProductCategory> = [
+  "All",
+  "Signature",
+  "Spring & Summer",
+  "Fall & Winter",
+  "Woody & Earthy",
+];
+
+type SortOption = "featured" | "price-asc" | "price-desc" | "name-asc";
 
 function CandleStore() {
+  const state = useEcommerceStore();
   const reduce = useReducedMotion();
-  const [scrolled, setScrolled] = useState(false);
-  const [menu, setMenu] = useState(false);
-  const [cartOpen, setCartOpen] = useState(false);
-  const [checkout, setCheckout] = useState(false);
-  const [quick, setQuick] = useState<Product | null>(null);
-  const [cart, setCart] = useState<CartLine[]>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("cart");
-      if (saved) return JSON.parse(saved);
-    }
-    return [];
-  });
+  const [quickProduct, setQuickProduct] = useState<Product | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<"All" | ProductCategory>("All");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<SortOption>("featured");
 
-  useEffect(() => {
-    localStorage.setItem("cart", JSON.stringify(cart));
-  }, [cart]);
-
-  const [notice, setNotice] = useState("");
   const { scrollYProgress } = useScroll();
   const heroY = useTransform(scrollYProgress, [0, 0.2], [0, reduce ? 0 : 45]);
 
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 30);
-    onScroll();
-    window.addEventListener("scroll", onScroll);
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-  const count = cart.reduce((sum, p) => sum + p.quantity, 0);
-  const subtotal = cart.reduce((sum, p) => sum + p.price * p.quantity, 0);
-  const add = (product: Product) => {
-    setCart((c) => {
-      const found = c.find((p) => p.id === product.id);
-      return found
-        ? c.map((p) => (p.id === product.id ? { ...p, quantity: p.quantity + 1 } : p))
-        : [...c, { ...product, quantity: 1 }];
+  const activeProducts = useMemo(
+    () => state.products.filter((p) => p.active),
+    [state.products],
+  );
+
+  const filteredProducts = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    const list = activeProducts.filter((p) => {
+      const matchesCat = selectedCategory === "All" || p.category === selectedCategory;
+      if (!matchesCat) return false;
+      if (!q) return true;
+      return (
+        p.name.toLowerCase().includes(q) ||
+        p.fragrance.toLowerCase().includes(q) ||
+        p.mood.toLowerCase().includes(q) ||
+        p.notes.top.toLowerCase().includes(q) ||
+        p.notes.heart.toLowerCase().includes(q) ||
+        p.notes.base.toLowerCase().includes(q)
+      );
     });
-    setNotice(`${product.name} added to your bag`);
-    setTimeout(() => setNotice(""), 2200);
-  };
-  const update = (id: number, delta: number) =>
-    setCart((c) =>
-      c
-        .map((p) => (p.id === id ? { ...p, quantity: Math.max(0, p.quantity + delta) } : p))
-        .filter((p) => p.quantity),
-    );
-  const nav = [
-    { label: "Home", id: "home" },
-    { label: "Our Story", id: "story" },
-    { label: "The Collection", id: "collection" },
-    { label: "Contact", id: "contact" },
-  ];
+
+    if (sortBy === "price-asc") {
+      return [...list].sort((a, b) => a.price - b.price);
+    }
+    if (sortBy === "price-desc") {
+      return [...list].sort((a, b) => b.price - a.price);
+    }
+    if (sortBy === "name-asc") {
+      return [...list].sort((a, b) => a.name.localeCompare(b.name));
+    }
+    return [...list].sort((a, b) => Number(b.featured) - Number(a.featured) || a.id - b.id);
+  }, [activeProducts, searchQuery, selectedCategory, sortBy]);
+
+  const featuredCandle = useMemo(
+    () =>
+      activeProducts.find((p) => p.featured) ??
+      activeProducts.find((p) => p.slug === "ambrevelle") ??
+      activeProducts[0],
+    [activeProducts],
+  );
 
   return (
     <main>
-      <header
-        className={`fixed inset-x-0 top-0 z-40 transition-all duration-500 bg-[#FDF1EB] ${scrolled ? "border-b border-border shadow-sm" : ""}`}
-      >
-        <div className="mx-auto flex h-auto max-w-[1500px] items-center justify-between px-5 md:px-10">
-          <button
-            aria-label="Go home"
-            onClick={() => scrollTo("home")}
-          >
-            <img src="/logo.jpeg" alt="MADELEINE LUCIA Candle Co." className="h-[160px] w-auto object-contain" />
-          </button>
-          <nav className="hidden items-center gap-9 lg:flex">
-            {nav.map((n) => (
-              <button
-                key={n.id}
-                onClick={() => scrollTo(n.id)}
-                className="group relative py-2 text-xs font-medium text-charcoal"
-              >
-                <span>{n.label}</span>
-                <span className="absolute inset-x-0 bottom-0 h-px origin-left scale-x-0 bg-midnight transition-transform group-hover:scale-x-100" />
-              </button>
-            ))}
-          </nav>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => scrollTo("collection")}
-              className="hidden border border-midnight bg-midnight px-5 py-3 text-[10px] font-semibold uppercase tracking-[.18em] text-primary-foreground transition hover:bg-earth sm:block"
-            >
-              Shop Candles
-            </button>
-            <button
-              aria-label={`Open shopping bag with ${count} items`}
-              onClick={() => setCartOpen(true)}
-              className="relative grid size-11 place-items-center text-midnight"
-            >
-              <ShoppingBag size={20} strokeWidth={1.5} />
-              {count > 0 && (
-                <motion.span
-                  key={count}
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  className="absolute right-0 top-0 grid size-5 place-items-center rounded-full bg-earth text-[10px] text-primary-foreground"
-                >
-                  {count}
-                </motion.span>
-              )}
-            </button>
-            <button
-              aria-label="Open menu"
-              onClick={() => setMenu(true)}
-              className="grid size-11 place-items-center lg:hidden"
-            >
-              <Menu size={22} />
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <AnimatePresence>
-        {menu && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-midnight text-primary-foreground lg:hidden"
-          >
-            <button
-              aria-label="Close menu"
-              onClick={() => setMenu(false)}
-              className="absolute right-5 top-5 grid size-12 place-items-center"
-            >
-              <X />
-            </button>
-            <div className="flex h-full flex-col justify-center px-10">
-              {nav.map((n, i) => (
-                <motion.button
-                  key={n.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.1 * i }}
-                  onClick={() => {
-                    setMenu(false);
-                    scrollTo(n.id);
-                  }}
-                  className="border-b border-primary-foreground/20 py-5 text-left font-display text-4xl"
-                >
-                  {n.label}
-                </motion.button>
-              ))}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <StoreHeader isHome />
 
       <section
         id="home"
-        className="relative min-h-[760px] overflow-hidden bg-powder pt-20 lg:h-[92vh] lg:min-h-[720px]"
+        className="relative min-h-[780px] overflow-hidden bg-powder pt-36 lg:h-[94vh] lg:min-h-[760px]"
       >
         <motion.div style={{ y: heroY }} className="absolute inset-y-0 right-0 w-full lg:w-[58%]">
           <motion.img
@@ -301,7 +144,7 @@ function CandleStore() {
           />
           <div className="absolute inset-0 bg-gradient-to-r from-powder via-powder/60 to-transparent lg:from-powder lg:via-powder/15" />
         </motion.div>
-        <div className="relative mx-auto flex h-full max-w-[1500px] items-center px-5 py-28 md:px-10 lg:py-0">
+        <div className="relative mx-auto flex h-full max-w-[1500px] items-center px-5 py-24 md:px-10 lg:py-0">
           <div className="max-w-3xl lg:w-[57%]">
             <motion.p
               initial={{ opacity: 0, y: 12 }}
@@ -417,18 +260,109 @@ function CandleStore() {
             Find Your <em>Perfect Moment.</em>
           </h2>
           <p className="mx-auto mt-5 max-w-2xl leading-7 text-muted-foreground">
-            A curated collection of candle experiences inspired by comfort, warmth, beautiful
-            memories, and everyday rituals.
-          </p>
-          <p className="mt-3 text-[10px] uppercase tracking-[.18em] text-muted-foreground">
-            Sample collection and pricing for demonstration
+            A curated collection of small-batch soy & coconut wax candle experiences inspired by
+            comfort, warmth, beautiful memories, and everyday rituals.
           </p>
         </motion.div>
-        <div className="mx-auto mt-14 grid max-w-[1500px] grid-cols-2 gap-x-3 gap-y-10 md:gap-6 lg:grid-cols-4">
-          {products.map((p, i) => (
-            <ProductCard key={p.id} product={p} index={i} add={add} quick={setQuick} />
-          ))}
+
+        {/* E-Commerce Filter, Search & Sort Toolbar */}
+        <div className="mx-auto mt-12 max-w-[1500px] border-y border-border/80 py-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-wrap items-center gap-2">
+              {CATEGORIES.map((cat) => {
+                const active = selectedCategory === cat;
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setSelectedCategory(cat)}
+                    className={`px-4 py-2 text-[10px] font-semibold uppercase tracking-[.16em] transition ${
+                      active
+                        ? "bg-midnight text-primary-foreground"
+                        : "border border-border bg-ivory/70 text-charcoal hover:border-midnight"
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <div className="relative min-w-[230px]">
+                <Search
+                  size={14}
+                  className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+                />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search scent, note, or mood..."
+                  aria-label="Search candles"
+                  className="w-full border border-border bg-ivory py-2.5 pl-9 pr-8 text-xs outline-none transition focus:border-midnight"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    aria-label="Clear search"
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-midnight"
+                  >
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+
+              <div className="relative flex items-center">
+                <SlidersHorizontal
+                  size={13}
+                  className="pointer-events-none absolute left-3 text-muted-foreground"
+                />
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as SortOption)}
+                  aria-label="Sort collection"
+                  className="appearance-none border border-border bg-ivory py-2.5 pl-8 pr-8 text-[11px] font-medium uppercase tracking-[.12em] text-charcoal outline-none focus:border-midnight"
+                >
+                  <option value="featured">Featured</option>
+                  <option value="price-asc">Price: Low to High</option>
+                  <option value="price-desc">Price: High to Low</option>
+                  <option value="name-asc">Alphabetical</option>
+                </select>
+                <ChevronDown
+                  size={13}
+                  className="pointer-events-none absolute right-2.5 text-muted-foreground"
+                />
+              </div>
+            </div>
+          </div>
         </div>
+
+        {filteredProducts.length === 0 ? (
+          <div className="mx-auto mt-14 max-w-xl border border-border bg-ivory p-12 text-center">
+            <p className="font-display text-3xl text-midnight">No matching scents found</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Try clearing your search or exploring all fragrance families.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedCategory("All");
+                setSearchQuery("");
+              }}
+              className="mt-6 bg-midnight px-6 py-3 text-[10px] font-semibold uppercase tracking-[.16em] text-primary-foreground"
+            >
+              View All Candles
+            </button>
+          </div>
+        ) : (
+          <div className="mx-auto mt-12 grid max-w-[1500px] grid-cols-2 gap-x-3 gap-y-10 md:gap-6 lg:grid-cols-4">
+            {filteredProducts.map((p, i) => (
+              <ProductCard key={p.id} product={p} index={i} onQuickView={setQuickProduct} />
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="overflow-hidden bg-ivory py-24 lg:py-36">
@@ -464,54 +398,67 @@ function CandleStore() {
         </div>
       </section>
 
-      <section className="overflow-hidden bg-midnight text-primary-foreground">
-        <div className="mx-auto grid max-w-[1500px] items-center lg:grid-cols-2">
-          <motion.div {...fade} className="order-2 px-6 py-20 md:px-16 lg:order-1 lg:py-28">
-            <Eyebrow light>A moment of warmth</Eyebrow>
-            <h2 className="mt-5 font-display text-5xl leading-[.95] md:text-7xl">
-              Let the Evening
-              <br />
-              <em>Linger a Little Longer.</em>
-            </h2>
-            <p className="mt-7 max-w-lg leading-7 text-primary-foreground/70">
-              An inviting fragrance experience inspired by golden light, intimate spaces, and the
-              moments you wish could last forever.
-            </p>
-            <div className="mt-8 flex items-end gap-8 border-t border-primary-foreground/20 pt-7">
-              <div>
-                <p className="text-[9px] uppercase tracking-[.2em] text-dusty">Golden Amber & Warm Vanilla • 8 oz</p>
-                <p className="mt-2 font-display text-3xl">Ambrevelle</p>
+      {featuredCandle && (
+        <section className="overflow-hidden bg-midnight text-primary-foreground">
+          <div className="mx-auto grid max-w-[1500px] items-center lg:grid-cols-2">
+            <motion.div {...fade} className="order-2 px-6 py-20 md:px-16 lg:order-1 lg:py-28">
+              <Eyebrow light>Signature spotlight</Eyebrow>
+              <h2 className="mt-5 font-display text-5xl leading-[.95] md:text-7xl">
+                Let the Evening
+                <br />
+                <em>Linger a Little Longer.</em>
+              </h2>
+              <p className="mt-7 max-w-lg leading-7 text-primary-foreground/70">
+                {featuredCandle.description}
+              </p>
+              <div className="mt-8 flex items-end gap-8 border-t border-primary-foreground/20 pt-7">
+                <div>
+                  <p className="text-[9px] uppercase tracking-[.2em] text-dusty">
+                    {featuredCandle.fragrance} • {featuredCandle.size}
+                  </p>
+                  <p className="mt-2 font-display text-3xl">{featuredCandle.name}</p>
+                </div>
+                <span className="ml-auto font-display text-2xl">
+                  {formatMoney(featuredCandle.price)}
+                </span>
               </div>
-              <span className="ml-auto font-display text-2xl">$15.00</span>
-            </div>
-            <button
-              onClick={() => {
-                const featured = products.find((p) => p.name === "Ambrevelle") || products[1];
-                if (featured) add(featured);
-              }}
-              className="mt-9 flex items-center gap-3 bg-ivory px-7 py-4 text-[11px] font-semibold uppercase tracking-[.16em] text-midnight transition hover:bg-sage"
+              <div className="mt-9 flex flex-wrap gap-3">
+                <button
+                  disabled={featuredCandle.stock <= 0}
+                  onClick={() => addToCart(featuredCandle.id, 1, true)}
+                  className="flex items-center gap-3 bg-ivory px-7 py-4 text-[11px] font-semibold uppercase tracking-[.16em] text-midnight transition hover:bg-sage disabled:opacity-45"
+                >
+                  {featuredCandle.stock <= 0 ? "Sold Out" : "Add to Bag"}{" "}
+                  <ShoppingBag size={15} />
+                </button>
+                <Link
+                  to="/product/$slug"
+                  params={{ slug: featuredCandle.slug }}
+                  className="flex items-center gap-2 border border-primary-foreground/35 px-6 py-4 text-[11px] font-semibold uppercase tracking-[.16em] text-primary-foreground transition hover:border-ivory hover:bg-primary-foreground/10"
+                >
+                  Explore Scent Notes <ArrowRight size={14} />
+                </Link>
+              </div>
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, scale: 1.05 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true }}
+              transition={{ duration: 1 }}
+              className="order-1 h-[520px] lg:order-2 lg:h-[760px]"
             >
-              Add to Bag <ShoppingBag size={15} />
-            </button>
-          </motion.div>
-          <motion.div
-            initial={{ opacity: 0, scale: 1.05 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 1 }}
-            className="order-1 h-[520px] lg:order-2 lg:h-[760px]"
-          >
-            <img
-              loading="lazy"
-              src={"/products/ambrevelle.jpg"}
-              alt="Ambrevelle candle"
-              width={480}
-              height={620}
-              className="h-full w-full object-cover"
-            />
-          </motion.div>
-        </div>
-      </section>
+              <img
+                loading="lazy"
+                src={featuredCandle.image}
+                alt={`${featuredCandle.name} candle`}
+                width={480}
+                height={620}
+                className="h-full w-full object-cover"
+              />
+            </motion.div>
+          </div>
+        </section>
+      )}
 
       <section className="bg-powder px-5 py-24 md:px-10 lg:py-36">
         <div className="mx-auto grid max-w-7xl items-center gap-14 lg:grid-cols-[.9fr_1.1fr] lg:gap-24">
@@ -598,120 +545,103 @@ function CandleStore() {
 
       <ContactSection />
       <Newsletter />
-      <Footer nav={nav} />
+      <StoreFooter isHome />
 
       <AnimatePresence>
-        {notice && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
-            className="fixed bottom-6 left-1/2 z-[80] flex -translate-x-1/2 items-center gap-3 bg-midnight px-5 py-4 text-sm text-primary-foreground shadow-xl"
-          >
-            <Check size={16} />
-            {notice}
-          </motion.div>
-        )}
-      </AnimatePresence>
-      <AnimatePresence>
-        {cartOpen && (
-          <CartDrawer
-            cart={cart}
-            subtotal={subtotal}
-            update={update}
-            remove={(id) => setCart((c) => c.filter((p) => p.id !== id))}
-            close={() => setCartOpen(false)}
-            checkout={() => setCheckout(true)}
-          />
-        )}
-      </AnimatePresence>
-      <AnimatePresence>
-        {quick && (
-          <QuickView
-            product={quick}
-            close={() => setQuick(null)}
-            add={() => {
-              add(quick);
-              setQuick(null);
-            }}
-          />
-        )}
-      </AnimatePresence>
-      <AnimatePresence>
-        {checkout && (
-          <CheckoutModal cart={cart} subtotal={subtotal} close={() => setCheckout(false)} clearCart={() => setCart([])} />
+        {quickProduct && (
+          <QuickViewModal product={quickProduct} close={() => setQuickProduct(null)} />
         )}
       </AnimatePresence>
     </main>
   );
 }
 
-function Eyebrow({ children, light = false }: { children: React.ReactNode; light?: boolean }) {
-  return (
-    <p
-      className={`text-[10px] font-semibold uppercase tracking-[.28em] ${light ? "text-dusty" : "text-earth"}`}
-    >
-      {children}
-    </p>
-  );
-}
-
 function ProductCard({
   product,
   index,
-  add,
-  quick,
+  onQuickView,
 }: {
   product: Product;
   index: number;
-  add: (p: Product) => void;
-  quick: (p: Product) => void;
+  onQuickView: (p: Product) => void;
 }) {
+  const soldOut = product.stock <= 0;
+  const lowStock = !soldOut && product.stock <= product.lowStockThreshold;
+
   return (
     <motion.article
       initial={{ opacity: 0, y: 30 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
-      transition={{ delay: index * 0.08, duration: 0.7 }}
+      transition={{ delay: (index % 4) * 0.07, duration: 0.65 }}
       className="group"
     >
       <div className="relative aspect-[3/4] overflow-hidden bg-beige">
-        <img
-          loading="lazy"
-          src={product.image}
-          alt={`${product.name} candle`}
-          width={480}
-          height={620}
-          onClick={() => quick(product)}
-          className={`h-full w-full object-cover cursor-pointer transition duration-700 group-hover:scale-[1.04] ${product.position}`}
-        />
-        <div className="absolute inset-x-0 bottom-0 flex translate-y-full gap-2 p-3 transition-transform duration-300 group-hover:translate-y-0">
+        <Link to="/product/$slug" params={{ slug: product.slug }}>
+          <img
+            loading="lazy"
+            src={product.image}
+            alt={`${product.name} candle`}
+            width={480}
+            height={620}
+            className={`h-full w-full cursor-pointer object-cover transition duration-700 group-hover:scale-[1.04] ${product.position} ${
+              soldOut ? "opacity-75 grayscale-[25%]" : ""
+            }`}
+          />
+        </Link>
+
+        <div className="pointer-events-none absolute left-3 top-3 flex flex-col gap-1.5">
+          {soldOut && (
+            <span className="bg-charcoal px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[.16em] text-ivory">
+              Sold Out
+            </span>
+          )}
+          {lowStock && (
+            <span className="bg-ivory/95 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[.15em] text-midnight shadow-sm">
+              Only {product.stock} Left
+            </span>
+          )}
+          {product.featured && !soldOut && (
+            <span className="bg-midnight px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[.16em] text-primary-foreground">
+              Signature
+            </span>
+          )}
+        </div>
+
+        <div className="absolute inset-x-0 bottom-0 hidden translate-y-full gap-2 p-3 transition-transform duration-300 group-hover:translate-y-0 sm:flex">
           <button
-            onClick={() => add(product)}
-            className="flex flex-1 items-center justify-center gap-2 bg-midnight px-2 py-3 text-[9px] font-semibold uppercase tracking-[.1em] text-primary-foreground"
+            disabled={soldOut}
+            onClick={() => addToCart(product.id, 1, false)}
+            className="flex flex-1 items-center justify-center gap-2 bg-midnight px-2 py-3 text-[9px] font-semibold uppercase tracking-[.1em] text-primary-foreground transition hover:bg-earth disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Add to Bag <ArrowRight size={12} />
+            {soldOut ? "Sold Out" : "Add to Bag"} {!soldOut && <ArrowRight size={12} />}
           </button>
           <button
             aria-label={`Quick view ${product.name}`}
-            onClick={() => quick(product)}
-            className="grid size-10 place-items-center bg-ivory text-midnight"
+            onClick={() => onQuickView(product)}
+            className="grid size-10 place-items-center bg-ivory text-midnight transition hover:bg-cream"
           >
             <Search size={15} />
           </button>
         </div>
       </div>
+
       <div className="pt-5">
         <div className="flex items-start justify-between gap-2">
-          <h3 
-            onClick={() => quick(product)} 
-            className="font-display text-2xl text-midnight md:text-3xl cursor-pointer hover:opacity-80 transition"
+          <Link
+            to="/product/$slug"
+            params={{ slug: product.slug }}
+            className="font-display text-2xl text-midnight transition hover:opacity-80 md:text-3xl"
           >
             {product.name}
-          </h3>
+          </Link>
           <div className="text-right">
-            <span className="block pt-1 text-sm font-medium text-charcoal">{money(product.price)}</span>
-            <span className="text-[10px] text-muted-foreground uppercase tracking-wider">{product.size}</span>
+            <span className="block pt-1 text-sm font-medium text-charcoal">
+              {formatMoney(product.price)}
+            </span>
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+              {product.size}
+            </span>
           </div>
         </div>
         <p className="mt-1 text-[10px] uppercase tracking-[.13em] text-earth">
@@ -722,14 +652,15 @@ function ProductCard({
         </p>
         <div className="mt-4 flex gap-2 sm:hidden">
           <button
-            onClick={() => add(product)}
-            className="flex-1 bg-midnight px-2 py-3 text-[9px] font-semibold uppercase tracking-[.08em] text-primary-foreground"
+            disabled={soldOut}
+            onClick={() => addToCart(product.id, 1, false)}
+            className="flex-1 bg-midnight px-2 py-3 text-[9px] font-semibold uppercase tracking-[.08em] text-primary-foreground disabled:opacity-50"
           >
-            Add to Bag
+            {soldOut ? "Sold Out" : "Add to Bag"}
           </button>
           <button
             aria-label={`Quick view ${product.name}`}
-            onClick={() => quick(product)}
+            onClick={() => onQuickView(product)}
             className="grid size-10 place-items-center border border-midnight"
           >
             <Search size={14} />
@@ -774,11 +705,21 @@ function StoryPanel({
 }
 
 function ContactSection() {
+  const state = useEcommerceStore();
   const [sent, setSent] = useState(false);
-  const submit = (e: FormEvent) => {
+
+  const submit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    submitCustomerInquiry({
+      name: String(fd.get("name") ?? ""),
+      email: String(fd.get("email") ?? ""),
+      inquiryType: String(fd.get("inquiry_type") ?? "General Inquiry"),
+      message: String(fd.get("message") ?? ""),
+    });
     setSent(true);
   };
+
   return (
     <section id="contact" className="bg-cream px-5 py-24 md:px-10 lg:py-32">
       <div className="mx-auto grid max-w-7xl gap-14 lg:grid-cols-[.85fr_1.15fr] lg:gap-24">
@@ -788,25 +729,37 @@ function ContactSection() {
             Let's Create Something <em>Beautiful Together.</em>
           </h2>
           <p className="mt-7 max-w-lg leading-7 text-muted-foreground">
-            Have a question about our candles, your order, or a special inquiry? We'd love to hear
-            from you.
+            Have a question about our candles, your order, or a special event inquiry? We'd love to
+            hear from you.
           </p>
           <div className="mt-10 space-y-3 text-sm">
             <a
-              href="mailto:info@madeleineluciacandle.com"
+              href={`mailto:${state.settings.supportEmail}`}
               className="block underline decoration-dusty underline-offset-4"
             >
-              info@madeleineluciacandle.com
+              {state.settings.supportEmail}
             </a>
           </div>
         </motion.div>
         {sent ? (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center py-10 text-center">
-            <Check size={48} className="text-earth mb-6" />
-            <h3 className="font-display text-4xl text-midnight mb-4">Message Sent</h3>
-            <p className="text-muted-foreground max-w-md">
-              Thank you for reaching out. We have received your inquiry and will get back to you shortly. (This is a demonstration form)
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex flex-col items-center justify-center py-10 text-center"
+          >
+            <Check size={48} className="mb-6 text-earth" />
+            <h3 className="mb-4 font-display text-4xl text-midnight">Message Received</h3>
+            <p className="max-w-md text-muted-foreground">
+              Thank you for reaching out to Madeleine Lucia Candle Co. Your inquiry has been logged
+              for our studio team and we will reply shortly.
             </p>
+            <button
+              type="button"
+              onClick={() => setSent(false)}
+              className="mt-6 text-xs font-semibold uppercase tracking-[.15em] text-midnight underline underline-offset-4"
+            >
+              Send Another Message
+            </button>
           </motion.div>
         ) : (
           <motion.form {...fade} onSubmit={submit} className="grid gap-7 md:grid-cols-2">
@@ -832,11 +785,14 @@ function ContactSection() {
                 Inquiry Type
               </span>
               <div className="relative">
-                <select name="inquiry_type" className="w-full appearance-none border-0 border-b border-charcoal/30 bg-transparent py-3 outline-none focus:border-midnight">
+                <select
+                  name="inquiry_type"
+                  className="w-full appearance-none border-0 border-b border-charcoal/30 bg-transparent py-3 outline-none focus:border-midnight"
+                >
                   <option>General Inquiry</option>
                   <option>Product Question</option>
                   <option>Order Support</option>
-                  <option>Special Request</option>
+                  <option>Special Request / Events</option>
                 </select>
                 <ChevronDown className="pointer-events-none absolute right-0 top-3" size={16} />
               </div>
@@ -853,7 +809,10 @@ function ContactSection() {
               />
             </label>
             <div className="md:col-span-2">
-              <button type="submit" className="bg-midnight px-8 py-4 text-[10px] font-semibold uppercase tracking-[.16em] text-primary-foreground transition hover:bg-earth">
+              <button
+                type="submit"
+                className="bg-midnight px-8 py-4 text-[10px] font-semibold uppercase tracking-[.16em] text-primary-foreground transition hover:bg-earth"
+              >
                 Send Message
               </button>
             </div>
@@ -878,14 +837,17 @@ function Newsletter() {
             A Little Light in Your Inbox.
           </h2>
           <p className="mt-4 max-w-xl text-charcoal/75">
-            Discover new collections, thoughtful stories, and beautiful moments from Madeleine Lucia
-            Candle.
+            Discover seasonal pours, thoughtful stories, and early access to limited batches from
+            Madeleine Lucia Candle.
           </p>
         </div>
         <form
           onSubmit={(e) => {
             e.preventDefault();
+            const fd = new FormData(e.currentTarget);
+            addNewsletterSubscriber(String(fd.get("email") ?? ""));
             setJoined(true);
+            e.currentTarget.reset();
           }}
           className="flex border-b border-midnight pb-2"
         >
@@ -898,421 +860,11 @@ function Newsletter() {
             className="min-w-0 flex-1 bg-transparent px-2 outline-none placeholder:text-charcoal/60"
           />
           <button className="flex items-center gap-2 px-3 py-3 text-[10px] font-semibold uppercase tracking-[.15em] text-midnight">
-            {joined ? "Thank you" : "Join the List"}{" "}
+            {joined ? "Subscribed" : "Join the List"}{" "}
             {joined ? <Check size={15} /> : <ArrowRight size={15} />}
           </button>
         </form>
-        <p className="text-[10px] text-charcoal/60 md:col-start-2">
-          Demonstration signup — email service connection coming in production.
-        </p>
       </motion.div>
     </section>
-  );
-}
-
-function Footer({ nav }: { nav: { label: string; id: string }[] }) {
-  return (
-    <footer className="bg-midnight px-5 pb-8 pt-20 text-primary-foreground md:px-10">
-      <div className="mx-auto grid max-w-7xl gap-12 border-b border-primary-foreground/20 pb-16 md:grid-cols-[1.4fr_.6fr_.8fr]">
-        <div>
-          <img src="/logo.jpeg" alt="MADELEINE LUCIA Candle Co." className="h-[160px] w-auto object-contain" />
-          <p className="mt-6 font-display text-2xl italic text-primary-foreground/70">
-            Handcrafted moments, made to be felt.
-          </p>
-        </div>
-        <div>
-          <p className="text-[9px] uppercase tracking-[.2em] text-dusty">Explore</p>
-          <div className="mt-5 flex flex-col items-start gap-3">
-            {nav.map((n) => (
-              <button
-                key={n.id}
-                onClick={() => scrollTo(n.id)}
-                className="text-sm text-primary-foreground/75 transition hover:text-primary-foreground"
-              >
-                {n.label}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div>
-          <p className="text-[9px] uppercase tracking-[.2em] text-dusty">Contact</p>
-          <a
-            href="mailto:info@madeleineluciacandle.com"
-            className="mt-5 block text-sm text-primary-foreground/75"
-          >
-            info@madeleineluciacandle.com
-          </a>
-          <div className="mt-6 flex gap-3">
-            <span
-              aria-label="Instagram placeholder"
-              className="grid size-9 place-items-center border border-primary-foreground/30"
-            >
-              <Instagram size={15} />
-            </span>
-            <span
-              aria-label="Pinterest placeholder"
-              className="grid size-9 place-items-center border border-primary-foreground/30 font-display text-lg"
-            >
-              P
-            </span>
-          </div>
-        </div>
-      </div>
-      <div className="mx-auto mt-7 flex max-w-7xl flex-wrap justify-between gap-3 text-[10px] text-primary-foreground/50">
-        <span>© Madeleine Lucia Candle LLC. All rights reserved.</span>
-        <span>Images and products shown for concept demonstration.</span>
-      </div>
-    </footer>
-  );
-}
-
-function CartDrawer({
-  cart,
-  subtotal,
-  update,
-  remove,
-  close,
-  checkout,
-}: {
-  cart: CartLine[];
-  subtotal: number;
-  update: (id: number, d: number) => void;
-  remove: (id: number) => void;
-  close: () => void;
-  checkout: () => void;
-}) {
-  return (
-    <>
-      <motion.button
-        aria-label="Close cart"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={close}
-        className="fixed inset-0 z-50 bg-midnight/55 backdrop-blur-sm"
-      />
-      <motion.aside
-        initial={{ x: "100%" }}
-        animate={{ x: 0 }}
-        exit={{ x: "100%" }}
-        transition={{ type: "spring", damping: 28, stiffness: 240 }}
-        className="fixed bottom-0 right-0 top-0 z-[60] flex w-full max-w-md flex-col bg-ivory shadow-2xl"
-      >
-        <div className="flex items-center justify-between border-b p-6">
-          <div>
-            <p className="font-display text-3xl text-midnight">Your Bag</p>
-            <p className="text-xs text-muted-foreground">
-              {cart.reduce((s, p) => s + p.quantity, 0)} items
-            </p>
-          </div>
-          <button
-            aria-label="Close cart"
-            onClick={close}
-            className="grid size-10 place-items-center"
-          >
-            <X size={20} />
-          </button>
-        </div>
-        {cart.length === 0 ? (
-          <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
-            <ShoppingBag size={38} strokeWidth={1} className="text-earth" />
-            <h3 className="mt-5 font-display text-3xl text-midnight">Your bag is waiting</h3>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Find a candle for your next beautiful moment.
-            </p>
-            <button
-              onClick={() => {
-                close();
-                scrollTo("collection");
-              }}
-              className="mt-7 bg-midnight px-6 py-4 text-[10px] uppercase tracking-[.15em] text-primary-foreground"
-            >
-              Explore the Collection
-            </button>
-          </div>
-        ) : (
-          <>
-            <div className="flex-1 overflow-auto p-6">
-              {cart.map((p) => (
-                <div key={p.id} className="mb-6 flex gap-4 border-b pb-6">
-                  <img src={p.image} alt="" className="h-28 w-24 object-cover" />
-                  <div className="flex flex-1 flex-col">
-                    <div className="flex justify-between gap-2">
-                      <div>
-                        <p className="font-display text-xl text-midnight">{p.name}</p>
-                        <p className="text-[10px] uppercase tracking-[.1em] text-earth">
-                          {p.fragrance} • {p.size || "8 oz"}
-                        </p>
-                      </div>
-                      <p className="text-sm">{money(p.price * p.quantity)}</p>
-                    </div>
-                    <div className="mt-auto flex items-center justify-between">
-                      <div className="flex items-center border">
-                        <button
-                          aria-label="Decrease quantity"
-                          onClick={() => update(p.id, -1)}
-                          className="grid size-8 place-items-center"
-                        >
-                          <Minus size={12} />
-                        </button>
-                        <span className="w-7 text-center text-xs">{p.quantity}</span>
-                        <button
-                          aria-label="Increase quantity"
-                          onClick={() => update(p.id, 1)}
-                          className="grid size-8 place-items-center"
-                        >
-                          <Plus size={12} />
-                        </button>
-                      </div>
-                      <button
-                        aria-label={`Remove ${p.name}`}
-                        onClick={() => remove(p.id)}
-                        className="text-muted-foreground hover:text-charcoal"
-                      >
-                        <Trash2 size={15} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="border-t bg-cream p-6">
-              <div className="flex justify-between font-display text-2xl text-midnight">
-                <span>Subtotal</span>
-                <span>{money(subtotal)}</span>
-              </div>
-              <p className="mt-2 text-xs text-muted-foreground">
-                Shipping and taxes calculated in checkout preview.
-              </p>
-              <button
-                onClick={checkout}
-                className="mt-5 w-full bg-midnight py-4 text-[10px] font-semibold uppercase tracking-[.16em] text-primary-foreground"
-              >
-                Continue to Checkout
-              </button>
-            </div>
-          </>
-        )}
-      </motion.aside>
-    </>
-  );
-}
-
-function QuickView({
-  product,
-  close,
-  add,
-}: {
-  product: Product;
-  close: () => void;
-  add: () => void;
-}) {
-  return (
-    <div className="fixed inset-0 z-[70] grid place-items-center p-4">
-      <motion.button
-        aria-label="Close quick view"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={close}
-        className="absolute inset-0 bg-midnight/65 backdrop-blur-sm"
-      />
-      <motion.div
-        initial={{ opacity: 0, y: 25, scale: 0.98 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: 15 }}
-        className="relative grid w-full max-w-4xl max-h-[calc(100vh-2rem)] overflow-y-auto overflow-x-hidden bg-ivory md:grid-cols-2 md:overflow-hidden rounded-sm shadow-2xl"
-      >
-        <button
-          aria-label="Close"
-          onClick={close}
-          className="absolute right-3 top-3 z-10 grid size-10 place-items-center bg-ivory"
-        >
-          <X size={18} />
-        </button>
-        <img
-          src={product.image}
-          alt={`${product.name} candle`}
-          className="h-72 w-full object-cover md:h-[600px]"
-        />
-        <div className="flex flex-col justify-center p-8 md:p-12">
-          <Eyebrow>Quick view</Eyebrow>
-          <h2 className="mt-3 font-display text-5xl text-midnight">{product.name}</h2>
-          <p className="mt-2 text-xs uppercase tracking-[.15em] text-earth">{product.fragrance} • {product.size}</p>
-          <p className="mt-7 font-display text-2xl italic text-muted-foreground">{product.mood}</p>
-          <p className="mt-6 leading-7 text-muted-foreground">
-            A thoughtfully imagined candle experience created to bring warmth, atmosphere, and a
-            sense of pause to your space.
-          </p>
-          <p className="mt-8 font-display text-3xl">
-            {money(product.price)}{" "}
-            <span className="text-sm font-sans text-muted-foreground">({product.size})</span>
-          </p>
-          <button
-            onClick={add}
-            className="mt-7 flex items-center justify-center gap-3 bg-midnight py-4 text-[10px] font-semibold uppercase tracking-[.16em] text-primary-foreground"
-          >
-            Add to Bag <ShoppingBag size={15} />
-          </button>
-        </div>
-      </motion.div>
-    </div>
-  );
-}
-
-function CheckoutModal({
-  cart,
-  subtotal,
-  close,
-  clearCart,
-}: {
-  cart: CartLine[];
-  subtotal: number;
-  close: () => void;
-  clearCart: () => void;
-}) {
-  const [placed, setPlaced] = useState(false);
-  const shipping = subtotal > 0 ? 5 : 0;
-  const total = subtotal + shipping;
-
-  return (
-    <div className="fixed inset-0 z-[90] overflow-y-auto bg-midnight/70 p-3 backdrop-blur-sm md:p-8">
-      <motion.div
-        initial={{ opacity: 0, y: 25 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: 15 }}
-        className="mx-auto max-w-5xl bg-ivory"
-      >
-        <div className="flex items-center justify-between border-b px-6 py-5">
-          <div>
-            <p className="font-display text-3xl text-midnight">Checkout</p>
-            <p className="text-[10px] uppercase tracking-[.13em] text-earth">
-              Secure checkout
-            </p>
-          </div>
-          <button
-            aria-label="Close checkout"
-            onClick={close}
-            className="grid size-10 place-items-center"
-          >
-            <X />
-          </button>
-        </div>
-        {placed ? (
-          <div className="grid min-h-[500px] place-items-center p-8 text-center">
-            <div>
-              <Check className="mx-auto text-earth" size={40} />
-              <h3 className="mt-5 font-display text-4xl text-midnight">Order Placed Successfully!</h3>
-              <p className="mx-auto mt-3 max-w-md text-muted-foreground">
-                Your order has been confirmed. You will receive an email receipt with shipping details shortly.
-              </p>
-              <button
-                onClick={close}
-                className="mt-7 bg-midnight px-7 py-4 text-[10px] uppercase tracking-[.15em] text-primary-foreground"
-              >
-                Return to Shop
-              </button>
-            </div>
-          </div>
-        ) : (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              setPlaced(true);
-              clearCart();
-            }}
-            className="grid lg:grid-cols-[1fr_.8fr]"
-          >
-            <div className="space-y-9 p-6 md:p-10">
-              <CheckoutGroup
-                title="Contact information"
-                fields={["Email address", "Phone number"]}
-              />
-              <CheckoutGroup
-                title="Shipping address"
-                fields={["Full name", "Street address", "City", "State / Province", "Postal code"]}
-              />
-              <div>
-                <h3 className="font-display text-2xl text-midnight">Payment method</h3>
-                <label className="mt-4 flex items-start gap-3 border border-earth bg-powder/40 p-4">
-                  <input type="radio" defaultChecked className="mt-1 accent-midnight" />
-                  <span>
-                    <span className="block text-sm font-medium">Payment connection preview</span>
-                    <span className="mt-1 block text-xs text-muted-foreground">
-                      No card details are collected in this mockup.
-                    </span>
-                  </span>
-                </label>
-              </div>
-            </div>
-            <aside className="bg-cream p-6 md:p-10">
-              <h3 className="font-display text-2xl text-midnight">Order summary</h3>
-              <div className="mt-6 space-y-4">
-                {cart.map((p) => (
-                  <div key={p.id} className="flex items-center gap-3">
-                    <div className="relative">
-                      <img src={p.image} alt="" className="size-16 object-cover" />
-                      <span className="absolute -right-2 -top-2 grid size-5 place-items-center rounded-full bg-midnight text-[9px] text-primary-foreground">
-                        {p.quantity}
-                      </span>
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-display text-lg">{p.name}</p>
-                      <p className="text-[9px] uppercase tracking-[.1em] text-earth">
-                        {p.fragrance} • {p.size || "8 oz"}
-                      </p>
-                    </div>
-                    <span className="text-sm">{money(p.price * p.quantity)}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-8 border-t pt-5">
-                <div className="flex justify-between text-sm">
-                  <span>Subtotal</span>
-                  <span>{money(subtotal)}</span>
-                </div>
-                <div className="mt-3 flex justify-between text-sm">
-                  <span>Shipping</span>
-                  <span>{shipping === 0 ? "Free" : money(shipping)}</span>
-                </div>
-                <div className="mt-5 flex justify-between border-t pt-5 font-display text-2xl">
-                  <span>Total</span>
-                  <span>{money(total)}</span>
-                </div>
-              </div>
-              <button
-                type="submit"
-                className="mt-8 w-full bg-midnight py-4 text-[10px] font-semibold uppercase tracking-[.16em] text-primary-foreground"
-              >
-                Place Order
-              </button>
-              <p className="mt-3 text-center text-[10px] leading-4 text-muted-foreground">
-                Payment processed securely. This is a simulated checkout environment.
-              </p>
-            </aside>
-          </form>
-        )}
-      </motion.div>
-    </div>
-  );
-}
-
-function CheckoutGroup({ title, fields }: { title: string; fields: string[] }) {
-  return (
-    <fieldset>
-      <legend className="font-display text-2xl text-midnight">{title}</legend>
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        {fields.map((f, i) => (
-          <input
-            key={f}
-            required
-            name={f.toLowerCase().replace(/[^a-z0-9]/g, "_")}
-            type={f.includes("Email") ? "email" : "text"}
-            placeholder={f}
-            className={`border border-border bg-transparent px-4 py-3 text-sm outline-none focus:border-midnight`}
-          />
-        ))}
-      </div>
-    </fieldset>
   );
 }
